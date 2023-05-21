@@ -1,0 +1,12 @@
+[submodule "lisp/fingertip"]
+	path = lisp/fingertip
+	url = https://github.com/manateelazycat/fingertip.git
+[submodule "lisp/emacs-rime"]
+	path = lisp/emacs-rime
+	url = https://github.com/DogLooksGood/emacs-rime
+[submodule "lisp/dash"]
+	path = lisp/dash
+	url = https://github.com/magnars/dash.el.git
+[submodule "lisp/postframe"]
+	path = lisp/postframe
+	url = https://github.com/tumashu/posframe.git

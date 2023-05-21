@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t; -*-
 (tool-bar-mode -1)
 (scroll-bar-mode -1)
 
@@ -30,3 +31,6 @@
 ;; 像素级滚动
 (pixel-scroll-precision-mode 1)
 
+(require 'init-fingertip)
+(require 'init-treesit)
+(require 'init-emacs-rime)

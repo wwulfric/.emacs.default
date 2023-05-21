@@ -29,3 +29,5 @@ ido.last
 transient/
 eln-cache/
 org-persist/
+tree-sitter/
+librime/

@@ -20,4 +20,6 @@
   (interactive) (kill-buffer (current-buffer)))
 (global-set-key (kbd "C-x k") 'custom/kill-this-buffer)
 
+
+
 (provide 'global-shortkeys)

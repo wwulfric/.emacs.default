@@ -10,6 +10,9 @@
 ;; 退出时自动保存当前光标的位置，并在下次打开相应文件时自动将光标定位到上一次的位置
 ;; (save-place-mode 1)
 
+;; 进行缩进时不使用制表符（Tab）字符，而是使用空格字符进行缩进
+(setq-default indent-tabs-mode nil)
+
 (tool-bar-mode -1)
 (scroll-bar-mode -1)
 

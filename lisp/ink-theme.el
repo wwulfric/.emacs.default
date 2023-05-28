@@ -1,5 +1,10 @@
 ;; -*- lexical-binding: t; -*-
 
+(setq inhibit-startup-screen t) ;; 禁止emacs启动时显示欢迎屏幕
+(setq inhibit-startup-echo-area-message t) ;; 禁止emacs启动时在echo区域显示信息
+(setq inhibit-startup-message t) ;; 禁止emacs启动时显示启动信息
+(setq initial-scratch-message nil) ;; 设置初始暂存区(scratch buffer)的消息为空
+
 ;; 会将新窗口弹出到当前窗口的上面
 ;; (setq pop-up-windows nil)
 

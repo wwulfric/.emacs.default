@@ -10,3 +10,9 @@
 [submodule "lisp/postframe"]
 	path = lisp/postframe
 	url = https://github.com/tumashu/posframe.git
+[submodule "rime"]
+	path = rime
+	url = git@github.com:wwulfric/rime-ice.git
+[submodule "lisp/emacs-chinese-word-segmentation"]
+	path = lisp/emacs-chinese-word-segmentation
+	url = https://github.com/kanglmf/emacs-chinese-word-segmentation

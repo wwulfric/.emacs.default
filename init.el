@@ -1,22 +1,9 @@
 ;; -*- lexical-binding: t; -*-
-(tool-bar-mode -1)
-(scroll-bar-mode -1)
 
-;; 下方新增一行
-(global-set-key (kbd "<S-return>") (lambda ()
-				     (interactive)
-				     (end-of-line)
-				     (newline-and-indent)))
-;; 上方新增一行
-(global-set-key (kbd "<C-return>") (lambda ()
-				     (interactive)
-				     (previous-line)
-				     (end-of-line)
-				     (newline-and-indent)))
-;; 删除整行
-(global-set-key (kbd "<s-backspace>") (lambda ()
-				  (interactive)
-				  (kill-whole-line)))
+(setq gc-cons-threshold (* 100 1024 1024))
+
+;; 进行缩进时不使用制表符（Tab）字符，而是使用空格字符进行缩进
+(setq-default indent-tabs-mode nil)
 
 ;; load 插件 path
 (defvar emacs-root-dir (file-truename "~/.emacs.d/lisp/"))
@@ -31,6 +18,9 @@
 ;; 像素级滚动
 (pixel-scroll-precision-mode 1)
 
+(require 'global-shortkeys)
 (require 'init-fingertip)
 (require 'init-treesit)
 (require 'init-emacs-rime)
+(require 'ink-theme)
+

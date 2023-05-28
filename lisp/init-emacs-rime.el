@@ -3,5 +3,5 @@
 (setq rime-librime-root  "~/.emacs.d/librime/dist/")
 (setq default-input-method "rime"
       rime-show-candidate 'posframe)
-(setq rime-user-data-dir "~/Library/Rime")
+(setq rime-user-data-dir "~/.emacs.d/rime")
 (provide 'init-emacs-rime)

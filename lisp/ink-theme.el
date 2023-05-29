@@ -25,7 +25,7 @@
 ;; Font and frame size
 (set-face-font 'default "Roboto Mono Light 14")
 (setq default-frame-alist
-      (append (list '(width  . 72) '(height . 40)
+      (append (list '(width  . 100) '(height . 50)
                     '(vertical-scroll-bars . nil)
                     '(internal-border-width . 24)
                     '(font . "Roboto Mono Light 14"))))

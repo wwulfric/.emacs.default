@@ -16,3 +16,18 @@
 [submodule "lisp/emacs-chinese-word-segmentation"]
 	path = lisp/emacs-chinese-word-segmentation
 	url = https://github.com/kanglmf/emacs-chinese-word-segmentation
+[submodule "lisp/lsp-bridge"]
+	path = lisp/lsp-bridge
+	url = https://github.com/manateelazycat/lsp-bridge
+[submodule "lisp/posframe"]
+	path = lisp/posframe
+	url = https://github.com/tumashu/posframe
+[submodule "lisp/markdown-mode"]
+	path = lisp/markdown-mode
+	url = https://github.com/jrblevin/markdown-mode
+[submodule "lisp/yasnippet"]
+	path = lisp/yasnippet
+	url = https://github.com/joaotavora/yasnippet
+[submodule "lisp/markmacro"]
+	path = lisp/markmacro
+	url = https://github.com/manateelazycat/markmacro

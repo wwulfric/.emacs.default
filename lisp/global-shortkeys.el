@@ -5,11 +5,14 @@
 				     (end-of-line)
 				     (newline-and-indent)))
 ;; 上方新增一行
-(global-set-key (kbd "<C-return>") (lambda ()
-				     (interactive)
-				     (previous-line)
-				     (end-of-line)
-				     (newline-and-indent)))
+(global-set-key (kbd "<C-return>") 
+                (lambda ()
+                  (interactive)
+                  (unless (= (line-number-at-pos) 1)
+                    (previous-line))
+                  (end-of-line)
+                  (newline-and-indent)))
+
 ;; 删除整行
 (global-set-key (kbd "<s-backspace>") (lambda ()
 				  (interactive)

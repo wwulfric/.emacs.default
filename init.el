@@ -27,7 +27,7 @@
 (require 'edit-up)
 (require 'init-fingertip)
 (require 'init-treesit)
-;;(require 'init-emacs-rime)
+(require 'init-emacs-rime)
 ;(require 'ink-theme)
 (require 'init-jieba-word)
 (require 'init-lsp)

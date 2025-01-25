@@ -7,9 +7,6 @@
 [submodule "lisp/dash"]
 	path = lisp/dash
 	url = https://github.com/magnars/dash.el.git
-[submodule "lisp/postframe"]
-	path = lisp/postframe
-	url = https://github.com/tumashu/posframe.git
 [submodule "rime"]
 	path = rime
 	url = git@github.com:wwulfric/rime-ice.git

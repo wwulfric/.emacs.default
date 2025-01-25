@@ -10,7 +10,7 @@
             :internal-border-width 10))
 
 (setq default-input-method "rime"
-     rime-show-candidate 'posframe )
+     rime-show-candidate 'minibuffer )
 (setq rime-user-data-dir (concat (global/load-file-path) "../rime" ))
 
 (setq rime-disable-predicates

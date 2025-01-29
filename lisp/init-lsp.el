@@ -1,7 +1,7 @@
 (require 'yasnippet)
 (yas-global-mode 1)
 
-(setq lsp-bridge-python-command "/home/haidao/.emacs.default/.venv/bin/python")
+(setq lsp-bridge-python-command (concat (global/load-file-path) "../.venv/bin/python"))
 
 (require 'lsp-bridge)
 

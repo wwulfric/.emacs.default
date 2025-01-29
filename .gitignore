@@ -25,10 +25,12 @@ tramp
 network-security.data
 bookmarks
 ido.last
+smex-items
 *.cache
 transient/
 eln-cache/
 org-persist/
 tree-sitter/
 librime/
+.venv/
 early-init.el

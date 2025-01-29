@@ -35,6 +35,7 @@
                'typescript-mode-hook
                'c-ts-mode-hook
                'c++-ts-mode-hook
+               'java-ts-mode-hook
                'cmake-ts-mode-hook
                'toml-ts-mode-hook
                'css-ts-mode-hook

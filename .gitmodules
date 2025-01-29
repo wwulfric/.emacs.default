@@ -28,3 +28,9 @@
 [submodule "lisp/markmacro"]
 	path = lisp/markmacro
 	url = https://github.com/manateelazycat/markmacro
+[submodule "lisp/smex"]
+	path = lisp/smex
+	url = https://github.com/nonsequitur/smex
+[submodule "lisp/s.el"]
+	path = lisp/s.el
+	url = https://github.com/magnars/s.el

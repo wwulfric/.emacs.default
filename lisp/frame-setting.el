@@ -5,7 +5,13 @@
       (append (list '(width  . 100) '(height . 50)
                     '(vertical-scroll-bars . nil)
                     '(internal-border-width . 0)
-                    '(font . "Roboto Mono Light 12"))))
+                    '(font . "PT Mono 13"))))
+;; 全局显示行号
+(global-display-line-numbers-mode 1)
+;; 禁止鼠标拖拽行为
+(setq mouse-drag-and-drop-region nil)
+(global-unset-key [S-drag-mouse-1])
+(global-unset-key [S-mouse-1])
 
 (setq inhibit-startup-screen t) ;; 禁止emacs启动时显示欢迎屏幕
 (setq inhibit-startup-echo-area-message t) ;; 禁止emacs启动时在echo区域显示信息

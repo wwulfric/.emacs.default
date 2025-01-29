@@ -21,6 +21,17 @@
 ;; 像素级滚动
 (pixel-scroll-precision-mode 1)
 
+;; ido
+(ido-mode 1)
+;; smex
+(require 'smex)
+(global-set-key (kbd "M-x") 'smex)
+(global-set-key (kbd "M-X") 'smex-major-mode-commands)
+;; This is your old M-x.
+(global-set-key (kbd "C-c C-c M-x") 'execute-extended-command)
+;; ibuffer
+(global-set-key (kbd "C-x C-b") 'ibuffer)
+
 
 (require 'global-shortkeys)
 (require 'frame-setting)

@@ -8,6 +8,14 @@
                     '(font . "PT Mono 13"))))
 ;; 全局显示行号
 (global-display-line-numbers-mode 1)
+;; 列号
+(column-number-mode t)
+
+
+;; 鼠标滚动
+(setq scroll-preserve-screen-position 'always)
+
+
 ;; 禁止鼠标拖拽行为
 (setq mouse-drag-and-drop-region nil)
 (global-unset-key [S-drag-mouse-1])
@@ -17,6 +25,9 @@
 (setq inhibit-startup-echo-area-message t) ;; 禁止emacs启动时在echo区域显示信息
 (setq inhibit-startup-message t) ;; 禁止emacs启动时显示启动信息
 (setq initial-scratch-message nil) ;; 设置初始暂存区(scratch buffer)的消息为空
+
+;; 像素级滚动
+(pixel-scroll-precision-mode 1)
 
 ;; 会将新窗口弹出到当前窗口的上面
 ;; (setq pop-up-windows nil)
@@ -60,8 +71,9 @@
 ;; 去除两侧边缘条（展示换行符等）No fringe but nice glyphs for truncated and wrapped lines
 (fringe-mode '(0 . 0))
 
-(defface fallback '((t :family "Fira Code Light"
-                       :inherit 'face-faded)) "Fallback")
+(defface fallback '((t :family "Fira Code"
+                       :inherit 'face-faded))
+  "Fallback")
 
 (set-display-table-slot standard-display-table 'truncation
                         (make-glyph-code ?… 'fallback))
@@ -69,5 +81,14 @@
                         (make-glyph-code ?↩ 'fallback))
 (set-display-table-slot standard-display-table 'selective-display
                         (string-to-vector " …"))
+
+;; yes or no
+(setq original-y-or-n-p 'y-or-n-p)
+
+
+;; 以16进制显示字节数
+(setq display-raw-bytes-as-hex t)
+
+
 
 (provide 'frame-setting)

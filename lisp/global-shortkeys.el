@@ -26,13 +26,37 @@
 ;; comment
 
 (defun my-comment-dwim ()
-  "Add comment at the beginning of line or region."
+  "Smart comment/uncomment for line or region.
+Always comment/uncomment from the beginning of lines."
   (interactive)
-  (if (region-active-p)
-      (comment-region (region-beginning) (region-end))
-    (comment-region (line-beginning-position) (line-end-position))))
+  (let (start end)
+    (if (region-active-p)
+        (progn
+          ;; 扩展选择区域到完整的行
+          (setq start (save-excursion
+                        (goto-char (region-beginning))
+                        (line-beginning-position)))
+          (setq end (save-excursion
+                      (goto-char (region-end))
+                      ;; 如果选择结束不在行首，包含整行
+                      (if (bolp)
+                          (point)
+                        (line-end-position)))))
+      ;; 单行处理
+      (setq start (line-beginning-position)
+            end (line-end-position)))
+    
+    ;; 使用内置函数进行注释/取消注释
+    (comment-or-uncomment-region start end)))
+
 
 (global-set-key (kbd "s-/") 'my-comment-dwim)
+
+
+;; 上下滚动
+(require 'move-text)
+(global-set-key (kbd "s-S-<up>") 'move-text-up)
+(global-set-key (kbd "s-S-<down>") 'move-text-down)
 
 
 (provide 'global-shortkeys)

@@ -34,3 +34,6 @@
 [submodule "lisp/s.el"]
 	path = lisp/s.el
 	url = https://github.com/magnars/s.el
+[submodule "lisp/move-text"]
+	path = lisp/move-text
+	url = https://github.com/manateelazycat/move-text

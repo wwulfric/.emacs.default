@@ -8,6 +8,9 @@
 (global-lsp-bridge-mode)
 ;;(setq lsp-bridge-enable-hover-diagnostic t)
 
+;; python
+(setq lsp-bridge-python-lsp-server "ruff")
+(setq lsp-bridge-python-multi-lsp-server "basedpyright_ruff")
 
 ;; java
 (require 'lsp-bridge-jdtls) ;; 根据项目自动生成自定义配置，添加必要的启动参数

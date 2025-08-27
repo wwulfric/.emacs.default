@@ -18,8 +18,6 @@
     (normal-top-level-add-subdirs-to-load-path)))
 (add-subdirs-to-load-path emacs-root-dir)
 
-;; 像素级滚动
-(pixel-scroll-precision-mode 1)
 
 ;; ido
 (ido-mode 1)

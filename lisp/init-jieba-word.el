@@ -6,6 +6,7 @@
 
 (setq cns-prog (concat (global/load-file-path) "emacs-chinese-word-segmentation/cnws"))
 (setq cns-dict-directory (concat (global/load-file-path) "emacs-chinese-word-segmentation/cppjieba/dict"))
+(setq cns-process-type 'shell)
 
 ;;(message cns-prog)
 
@@ -16,6 +17,26 @@
   (add-hook 'find-file-hook 'cns-auto-enable))
 
 (global-cns-mode t)
+
+(defun smart-backward-word ()
+  "智能向后单词移动"
+  (interactive)
+  (let* ((current-point (point))
+         (syntax-point
+          (save-excursion
+            (skip-syntax-backward (string (char-syntax (char-before))))
+            (point)))
+         (subword-point
+          (save-excursion
+            (cns-backward-word)
+            (point))))
+    (if (and (< subword-point current-point)
+             (> subword-point syntax-point))
+        (goto-char subword-point)
+      (goto-char syntax-point))))
+
+(global-set-key (kbd "M-b") 'smart-backward-word)
+
 (provide 'init-jieba-word)
 
 

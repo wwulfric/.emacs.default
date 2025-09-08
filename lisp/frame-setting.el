@@ -5,7 +5,7 @@
       (append (list '(width  . 100) '(height . 50)
                     '(vertical-scroll-bars . nil)
                     '(internal-border-width . 0)
-                    '(font . "PT Mono 13"))))
+                    '(font . "PT Mono 14"))))
 ;; 全局显示行号
 (global-display-line-numbers-mode 1)
 ;; 列号
@@ -50,7 +50,7 @@
 ;;                     'internal-border-width 0)
 
 ;; Line spacing, can be 0 for code and 1 or 2 for text
-(setq-default line-spacing 2)
+(setq-default line-spacing 5)
 
 ;; Underline line at descent position, not baseline position
 ;; x-underline-at-descent-line 是 Emacs 中一个用于定制下划线绘制位置的变量。当它的值为 t 时，Emacs 会将下划线绘制在当前字符的下缘线位置，而不是字符底部的基线位置。这通常用于改善下划线在一些字体中的呈现效果，因为一些字体的下沉线比基线更粗或更加突出，使得下划线在字符底部看起来可能会有些偏离或不对齐。
@@ -89,6 +89,20 @@
 ;; 以16进制显示字节数
 (setq display-raw-bytes-as-hex t)
 
+
+;; ido mode
+(require 'flx-ido)
+(ido-mode 1)
+(ido-everywhere 1)
+(flx-ido-mode 1)
+;; disable ido faces to see flx highlights.
+(setq ido-enable-flex-matching t)
+(setq ido-use-faces nil)
+
+;; auto save
+(require 'auto-save)
+(auto-save-enable)
+(setq auto-save-silent t)
 
 
 (provide 'frame-setting)

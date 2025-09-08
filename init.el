@@ -19,8 +19,6 @@
 (add-subdirs-to-load-path emacs-root-dir)
 
 
-;; ido
-(ido-mode 1)
 ;; smex
 (require 'smex)
 (global-set-key (kbd "M-x") 'smex)

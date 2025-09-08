@@ -12,7 +12,7 @@
 	url = git@github.com:wwulfric/rime-ice.git
 [submodule "lisp/emacs-chinese-word-segmentation"]
 	path = lisp/emacs-chinese-word-segmentation
-	url = https://github.com/kanglmf/emacs-chinese-word-segmentation
+	url = git@github.com:wwulfric/emacs-chinese-word-segmentation.git
 [submodule "lisp/lsp-bridge"]
 	path = lisp/lsp-bridge
 	url = https://github.com/manateelazycat/lsp-bridge
@@ -37,3 +37,9 @@
 [submodule "lisp/move-text"]
 	path = lisp/move-text
 	url = https://github.com/manateelazycat/move-text
+[submodule "lisp/auto-save"]
+	path = lisp/auto-save
+	url = https://github.com/manateelazycat/auto-save
+[submodule "lisp/flx"]
+	path = lisp/flx
+	url = https://github.com/lewang/flx

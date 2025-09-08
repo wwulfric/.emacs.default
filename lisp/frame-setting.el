@@ -50,7 +50,7 @@
 ;;                     'internal-border-width 0)
 
 ;; Line spacing, can be 0 for code and 1 or 2 for text
-(setq-default line-spacing 5)
+(setq-default line-spacing 2)
 
 ;; Underline line at descent position, not baseline position
 ;; x-underline-at-descent-line 是 Emacs 中一个用于定制下划线绘制位置的变量。当它的值为 t 时，Emacs 会将下划线绘制在当前字符的下缘线位置，而不是字符底部的基线位置。这通常用于改善下划线在一些字体中的呈现效果，因为一些字体的下沉线比基线更粗或更加突出，使得下划线在字符底部看起来可能会有些偏离或不对齐。

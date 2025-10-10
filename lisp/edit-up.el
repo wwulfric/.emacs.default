@@ -13,6 +13,8 @@
 
 ;; delsel 提供的功能，选中之后的修改是删除再修改，而不是默认的insert
 (delete-selection-mode 1)
+;; 禁用与系统剪贴板的同步
+;;(setq select-enable-clipboard nil)
 
 
 ;; C-x 剪切，C-c, C-v 等支持；按中 shift 选择

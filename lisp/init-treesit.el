@@ -96,6 +96,7 @@
         (elisp . ("https://github.com/Wilfred/tree-sitter-elisp"))
         (go . ("https://github.com/tree-sitter/tree-sitter-go"))
         (gomod      . ("https://github.com/camdencheek/tree-sitter-go-mod.git"))
+        (haskell "https://github.com/tree-sitter/tree-sitter-haskell" "master" "src" nil nil)
         (html . ("https://github.com/tree-sitter/tree-sitter-html"))
         (java       . ("https://github.com/tree-sitter/tree-sitter-java.git"))
         (javascript . ("https://github.com/tree-sitter/tree-sitter-javascript"))
@@ -148,6 +149,8 @@
 (add-hook 'ielm-mode-hook #'(lambda () (treesit-parser-create 'elisp)))
 (add-hook 'json-mode-hook #'(lambda () (treesit-parser-create 'json)))
 (add-hook 'go-mode-hook #'(lambda () (treesit-parser-create 'go)))
+(add-hook 'haskell-mode-hook #'(lambda () (treesit-parser-create 'haskell)))
+
 
 (provide 'init-treesit)
 

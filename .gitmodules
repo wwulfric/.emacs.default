@@ -43,3 +43,6 @@
 [submodule "lisp/flx"]
 	path = lisp/flx
 	url = https://github.com/lewang/flx
+[submodule "lisp/haskell-mode"]
+	path = lisp/haskell-mode
+	url = https://github.com/haskell/haskell-mode

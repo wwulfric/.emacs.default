@@ -19,5 +19,8 @@
 ;; haskell
 (require 'haskell-mode-autoloads)
 
+;; markdown
+(setq lsp-bridge-markdown-lsp-server "marksman")
+
 
 (provide 'init-lsp)

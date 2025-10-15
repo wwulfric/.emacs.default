@@ -86,6 +86,7 @@
 
 ;; yes or no
 (setq original-y-or-n-p 'y-or-n-p)
+(fset 'yes-or-no-p 'y-or-n-p)
 
 
 ;; 以16进制显示字节数

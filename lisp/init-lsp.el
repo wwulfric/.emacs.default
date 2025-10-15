@@ -20,7 +20,9 @@
 (require 'haskell-mode-autoloads)
 
 ;; markdown
+(require 'markdown-ts-mode)
 (setq lsp-bridge-markdown-lsp-server "marksman")
+(setq markdown-command "pandoc")
 
 
 (provide 'init-lsp)

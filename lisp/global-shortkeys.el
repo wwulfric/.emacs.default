@@ -13,10 +13,17 @@
                   (end-of-line)
                   (newline-and-indent)))
 
+(defun my-delete-whole-line ()
+  "Delete the current line without copying to kill ring."
+  (interactive)
+  (delete-region (line-beginning-position) 
+                 (1+ (line-end-position))))
 ;; 删除整行
 (global-set-key (kbd "<s-backspace>") (lambda ()
 				  (interactive)
-				  (kill-whole-line)))
+				  ;; (kill-whole-line)
+                                  (my-delete-whole-line)
+                                  ))
 
 ;; kill buffer
 (defun custom/kill-this-buffer ()
@@ -58,5 +65,11 @@ Always comment/uncomment from the beginning of lines."
 (global-set-key (kbd "s-S-<up>") 'move-text-up)
 (global-set-key (kbd "s-S-<down>") 'move-text-down)
 
+
+;; 只禁用鼠标滚轮缩放，保留 Ctrl+= 等键盘快捷键
+(global-unset-key (kbd "C-<wheel-up>"))
+(global-unset-key (kbd "C-<wheel-down>"))
+(global-unset-key (kbd "C-<mouse-4>"))
+(global-unset-key (kbd "C-<mouse-5>"))
 
 (provide 'global-shortkeys)

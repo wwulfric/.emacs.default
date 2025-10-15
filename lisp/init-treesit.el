@@ -103,7 +103,9 @@
         (json . ("https://github.com/tree-sitter/tree-sitter-json"))
         (lua . ("https://github.com/Azganoth/tree-sitter-lua"))
         (make . ("https://github.com/alemuller/tree-sitter-make"))
-        (markdown . ("https://github.com/MDeiml/tree-sitter-markdown" nil "tree-sitter-markdown/src"))
+        ;; (markdown . ("https://github.com/MDeiml/tree-sitter-markdown" nil "tree-sitter-markdown/src"))
+        (markdown . ("https://github.com/tree-sitter-grammars/tree-sitter-markdown" "split_parser" "tree-sitter-markdown/src"))
+        (markdown-inline . ("https://github.com/tree-sitter-grammars/tree-sitter-markdown" "split_parser" "tree-sitter-markdown-inline/src"))
         (ocaml . ("https://github.com/tree-sitter/tree-sitter-ocaml" nil "ocaml/src"))
         (org . ("https://github.com/milisims/tree-sitter-org"))
         (python . ("https://github.com/tree-sitter/tree-sitter-python"))
@@ -127,6 +129,7 @@
         (js-mode         . js-ts-mode)
         (js-json-mode    . json-ts-mode)
 	(java-mode       . java-ts-mode)
+        (markdown-mode   . markdown-ts-mode)
         (python-mode     . python-ts-mode)
         (sh-mode         . bash-ts-mode)
         (typescript-mode . typescript-ts-mode)
@@ -134,7 +137,8 @@
         (yaml-mode       . yaml-ts-mode)
         ))
 
-(add-hook 'markdown-mode-hook #'(lambda () (treesit-parser-create 'markdown)))
+;; (add-hook 'markdown-mode-hook #'(lambda () (treesit-parser-create 'markdown)))
+(add-hook 'markdown-ts-mode-hook #'(lambda () (treesit-parser-create 'markdown)))
 
 (add-hook 'web-mode-hook #'(lambda ()
                              (let ((file-name (buffer-file-name)))

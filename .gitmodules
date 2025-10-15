@@ -46,3 +46,9 @@
 [submodule "lisp/haskell-mode"]
 	path = lisp/haskell-mode
 	url = https://github.com/haskell/haskell-mode
+[submodule "lisp/exec-path-from-shell"]
+	path = lisp/exec-path-from-shell
+	url = https://github.com/purcell/exec-path-from-shell
+[submodule "lisp/markdown-ts-mode"]
+	path = lisp/markdown-ts-mode
+	url = https://github.com/LionyxML/markdown-ts-mode

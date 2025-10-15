@@ -9,10 +9,10 @@
 	url = https://github.com/magnars/dash.el.git
 [submodule "rime"]
 	path = rime
-	url = git@github.com:wwulfric/rime-ice.git
+	url = https://github.com/wwulfric/rime-ice.git
 [submodule "lisp/emacs-chinese-word-segmentation"]
 	path = lisp/emacs-chinese-word-segmentation
-	url = git@github.com:wwulfric/emacs-chinese-word-segmentation.git
+	url = https://github.com/wwulfric/emacs-chinese-word-segmentation.git
 [submodule "lisp/lsp-bridge"]
 	path = lisp/lsp-bridge
 	url = https://github.com/manateelazycat/lsp-bridge

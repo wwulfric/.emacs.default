@@ -1,4 +1,4 @@
-;; -*- lexical-binding: t; -*-
+;; -*- Lexical-binding: t; -*-
 
 
 (setq default-frame-alist
@@ -51,7 +51,7 @@
 
 ;; Line spacing, can be 0 for code and 1 or 2 for text
 ;; (setq-default line-spacing nil)
-(setq-default default-text-properties '(line-spacing 0.25 line-height 1.25))
+(setq-default default-text-properties '(line-spacing 0.05 line-height 1.05))
 
 
 ;; Underline line at descent position, not baseline position

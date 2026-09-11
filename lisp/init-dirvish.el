@@ -17,6 +17,22 @@
 ;; A width of 0 merely hides the image and still reserves its fixed height.
 (setq dirvish-mode-line-bar-image-width nil)
 
+;; Share tab-line's font metrics and vertical padding, only in the sidebar.
+(require 'face-remap)
+(defvar-local my/dirvish-header-face-cookie nil)
+
+(defun my/dirvish-pad-project-title (title)
+  "Give the sidebar's TITLE the same vertical padding as buffer tabs."
+  (if-let* ((session (dirvish-curr))
+            ((eq (dv-type session) 'side)))
+      (concat (propertize " " 'face 'header-line
+                          'display (my/ui-header-space 0))
+              title)
+    title))
+
+(with-eval-after-load 'dirvish-widgets
+  (advice-add 'dirvish-project-ml :filter-return #'my/dirvish-pad-project-title))
+
 ;; Subtle selection colors, distinct when focus returns to the editor.
 ;; Avoid inheriting the theme's stronger highlight/region backgrounds.
 (custom-set-faces
@@ -81,9 +97,22 @@ Outside the sidebar, preserve Dired's usual mouse behavior."
 
 (defun my/dirvish-setup ()
   "Disable line numbers before a directory buffer is first displayed."
-  (display-line-numbers-mode -1))
+  (display-line-numbers-mode -1)
+  (when-let* ((session (dirvish-curr))
+              ((eq (dv-type session) 'side)))
+    (unless my/dirvish-header-face-cookie
+      (setq my/dirvish-header-face-cookie
+            (face-remap-add-relative 'header-line
+                                    :inherit 'tab-line :height 1.0 :box nil)))))
 (add-hook 'dired-mode-hook #'my/dirvish-setup)
 (add-hook 'dirvish-setup-hook #'my/dirvish-setup)
+
+;; Also update sidebars which were open when this configuration was reloaded.
+(dolist (buffer (buffer-list))
+  (with-current-buffer buffer
+    (when (derived-mode-p 'dired-mode)
+      (my/dirvish-setup))))
+(force-mode-line-update t)
 
 (defun my/dirvish-refresh-focus (frame)
   "Refresh sidebar selection faces when FRAME's selected window changes."

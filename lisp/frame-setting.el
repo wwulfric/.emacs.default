@@ -46,6 +46,43 @@
 (tool-bar-mode -1)
 (scroll-bar-mode -1)
 
+;; Flat buffer tabs, using the same font size as the editor.
+(defvar my/ui-header-height 1.4
+  "Shared height of buffer tabs and the Dirvish sidebar title, in font units.")
+
+(defun my/ui-header-space (width)
+  "Return a spacer display specification with WIDTH and shared header height."
+  `(space :width ,width :height ,my/ui-header-height :ascent 75))
+
+(defun my/tab-line-format-with-padding (tab tabs)
+  "Add clickable padding around the standard TAB label and close button."
+  (let* ((label (tab-line-tab-name-format-default tab tabs))
+         (padding (apply #'propertize " " (text-properties-at 0 label))))
+    ;; Share the vertical strut with Dirvish; keep the label font unchanged.
+    (put-text-property 0 1 'display
+                       (my/ui-header-space 1.2) padding)
+    (concat padding label padding)))
+
+(with-eval-after-load 'tab-line
+  (setq tab-line-tab-name-format-function #'my/tab-line-format-with-padding)
+  (custom-theme-set-faces
+   'user
+   '(tab-line
+     ((((background light)) :inherit default :height 1.0 :box nil :background "#F3F4F5")
+      (((background dark)) :inherit default :height 1.0 :box nil :background "#25282D")))
+   '(tab-line-tab
+     ((t :inherit tab-line :box nil :weight normal)))
+   '(tab-line-tab-inactive
+     ((((background light)) :inherit tab-line-tab :box nil :foreground "#555B63" :background "#F3F4F5")
+      (((background dark)) :inherit tab-line-tab :box nil :foreground "#B8BEC7" :background "#25282D")))
+   '(tab-line-tab-current
+     ((((background light)) :inherit tab-line-tab :box nil :weight bold :foreground "#245FA5" :background "#E3ECFA")
+      (((background dark)) :inherit tab-line-tab :box nil :weight bold :foreground "#A8CFFF" :background "#33445C")))
+   '(tab-line-highlight
+     ((((background light)) :box nil :background "#E7E9ED" :foreground "#20252B")
+      (((background dark)) :box nil :background "#3A3F47" :foreground "#F0F2F5"))))
+  (tab-line-force-update t))
+
 ;;(set-frame-parameter (selected-frame)
 ;;                     'internal-border-width 0)
 

@@ -52,3 +52,9 @@
 [submodule "lisp/markdown-ts-mode"]
 	path = lisp/markdown-ts-mode
 	url = https://github.com/LionyxML/markdown-ts-mode
+[submodule "lisp/dirvish"]
+	path = lisp/dirvish
+	url = https://github.com/alexluigit/dirvish.git
+[submodule "lisp/compat"]
+	path = lisp/compat
+	url = https://github.com/emacs-compat/compat.git

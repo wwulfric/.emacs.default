@@ -31,6 +31,7 @@
 
 (require 'global-shortkeys)
 (require 'frame-setting)
+(require 'init-dirvish)
 (require 'edit-up)
 (require 'init-fingertip)
 (require 'init-treesit)

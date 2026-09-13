@@ -100,12 +100,22 @@ Outside the sidebar, preserve Dired's usual mouse behavior."
   (display-line-numbers-mode -1)
   (when-let* ((session (dirvish-curr))
               ((eq (dv-type session) 'side)))
+    ;; The sidebar already has its project header; its internal buffer is no tab.
+    (setq-local tab-line-exclude t)
+    (when (bound-and-true-p tab-line-mode) (tab-line-mode -1))
     (unless my/dirvish-header-face-cookie
       (setq my/dirvish-header-face-cookie
             (face-remap-add-relative 'header-line
                                     :inherit 'tab-line :height 1.0 :box nil)))))
 (add-hook 'dired-mode-hook #'my/dirvish-setup)
 (add-hook 'dirvish-setup-hook #'my/dirvish-setup)
+
+(defun my/dirvish-side-hide-tabs (buffer)
+  "Hide tabs after Dirvish renames BUFFER into its internal sidebar."
+  (with-current-buffer buffer
+    (setq-local tab-line-exclude t)
+    (when (bound-and-true-p tab-line-mode) (tab-line-mode -1))))
+(advice-add 'dirvish-side-root-conf :after #'my/dirvish-side-hide-tabs)
 
 ;; Also update sidebars which were open when this configuration was reloaded.
 (dolist (buffer (buffer-list))
@@ -206,8 +216,16 @@ When several directories are visible, use the first one's root."
         (when (and (derived-mode-p 'dired-mode)
                    (not (window-parameter window 'window-side)))
           (setq directory (or directory default-directory))
-          (set-window-buffer window
-                             (my/dirvish-empty-buffer default-directory)))))
+          (let ((directory-buffer (current-buffer)))
+            (set-window-buffer window
+                               (my/dirvish-empty-buffer default-directory))
+            ;; Keep the Dired buffer alive, but remove the startup placeholder
+            ;; from this editor's navigation history and tab strip.
+            (set-window-prev-buffers
+             window (seq-remove (lambda (entry) (eq (car entry) directory-buffer))
+                                (window-prev-buffers window)))
+            (set-window-next-buffers
+             window (delq directory-buffer (window-next-buffers window)))))))
     (when directory
       (set-buffer (window-buffer (selected-window)))
       (my/dirvish-show directory))))

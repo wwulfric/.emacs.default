@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t; -*-
 (require 'rime)
 ;; (setq rime-emacs-module-header-root "/Applications/Emacs.app/Contents/Resources/include/")
 ;; (setq rime-librime-root  "../librime/dist/")

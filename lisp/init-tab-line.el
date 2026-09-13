@@ -2,6 +2,32 @@
 
 ;; Loaded after frame-setting, which defines the shared UI header spacing.
 (require 'seq)
+(require 'tab-line)
+
+(defun my/tab-line-buffer-visible-p (buffer)
+  "Return non-nil when BUFFER belongs in an editor tab strip."
+  (with-current-buffer buffer
+    (not (or (string-prefix-p " " (buffer-name))
+             tab-line-exclude
+             (memq major-mode tab-line-exclude-modes)
+             (get major-mode 'tab-line-exclude)))))
+
+(defun my/tab-line-filter-buffers (buffers)
+  "Remove internal sidebar and excluded buffers from BUFFERS."
+  (seq-filter #'my/tab-line-buffer-visible-p buffers))
+
+(defun my/tab-line-refresh-window-buffers (frame)
+  "Enable tabs in newly displayed process buffers on FRAME.
+Process buffers can be created without running a major-mode hook."
+  (when global-tab-line-mode
+    (dolist (window (window-list frame 'no-minibuffer))
+      (with-current-buffer (window-buffer window)
+        (if (my/tab-line-buffer-visible-p (current-buffer))
+            (unless tab-line-mode (tab-line-mode--turn-on))
+          (when tab-line-mode (tab-line-mode -1)))))))
+
+(advice-add 'tab-line-tabs-window-buffers :filter-return #'my/tab-line-filter-buffers)
+(add-hook 'window-buffer-change-functions #'my/tab-line-refresh-window-buffers)
 
 (defvar my/tab-line-hover-target nil
   "Window and tab currently under the mouse.")
@@ -13,10 +39,13 @@
          (frame (car mouse))
          (xy (cdr mouse))
          (position (when (and (frame-live-p frame)
-                              (numberp (car xy)) (numberp (cdr xy)))
+                              (integerp (car xy)) (integerp (cdr xy))
+                              (<= 0 (car xy)) (<= 0 (cdr xy))
+                              (< (car xy) (frame-pixel-width frame))
+                              (< (cdr xy) (frame-pixel-height frame)))
                      (posn-at-x-y (car xy) (cdr xy) frame)))
          (string (and position (posn-string position)))
-         (tab (and (eq (posn-area position) 'tab-line) string
+         (tab (and position (eq (posn-area position) 'tab-line) string
                    (get-text-property (cdr string) 'tab (car string))))
          (target (and tab (cons (posn-window position) tab))))
     (unless (equal target my/tab-line-hover-target)
@@ -82,6 +111,8 @@
      ((((background light)) :box nil :background "#E7E9ED" :foreground "#20252B")
       (((background dark)) :box nil :background "#3A3F47" :foreground "#F0F2F5"))))
   (tab-line-force-update t))
+
+(global-tab-line-mode 1)
 
 (provide 'init-tab-line)
 ;;; init-tab-line.el ends here

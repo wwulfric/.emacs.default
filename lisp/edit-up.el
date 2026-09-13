@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t; -*-
 ;; mark macro 键盘宏
 ;;(require 'markmacro)
 ;; 先C+SPC标记起点，然后按住Shift点选范围内的文字。下面2行 设为ignore是为了防止一些可能的副作用

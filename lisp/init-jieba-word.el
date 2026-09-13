@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t; -*-
 ;; jieba 分词
 ;; 需要提前编译出可执行文件，见：https://github.com/kanglmf/emacs-chinese-word-segmentation/blob/master/README.md#%E7%BC%96%E8%AF%91
 ;; 核心命令：

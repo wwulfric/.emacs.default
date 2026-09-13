@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t; -*-
 (require 'fingertip)
 
 (dolist (hook (list

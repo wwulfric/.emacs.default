@@ -6,7 +6,83 @@
                     '(vertical-scroll-bars . nil)
                     '(internal-border-width . 0)
                     '(font . "PT Mono 14"))))
-;; 全局显示行号
+
+;; Restore the native title bar and macOS traffic-light buttons on reload.
+(when (eq system-type 'darwin)
+  (add-to-list 'default-frame-alist '(undecorated-round . nil))
+  (add-to-list 'default-frame-alist '(undecorated . nil))
+  (dolist (frame (frame-list))
+    (when (and (eq (window-system frame) 'ns)
+               (not (frame-parent frame)))
+      (modify-frame-parameters frame '((undecorated-round . nil)
+                                       (undecorated . nil))))))
+
+(require 'project)
+(require 'vc-git)
+
+(defvar my/frame-title-cache (make-hash-table :test #'equal)
+  "Directory to (timestamp . title); avoid Git calls on every redisplay.")
+
+(defun my/frame-title-git-branch (directory)
+  "Return DIRECTORY's Git branch, or a short revision for detached HEAD."
+  (let ((default-directory directory))
+    (with-temp-buffer
+      (cond
+       ((zerop (process-file "git" nil '(t nil) nil
+                             "symbolic-ref" "--quiet" "--short" "HEAD"))
+        (string-trim (buffer-string)))
+       (t
+        (erase-buffer)
+        (when (zerop (process-file "git" nil '(t nil) nil
+                                   "rev-parse" "--short" "HEAD"))
+          (concat "detached " (string-trim (buffer-string)))))))))
+
+(defun my/frame-title ()
+  "Show the current project and Git branch, without repeating the tab name."
+  (let* ((directory default-directory)
+         (cached (gethash directory my/frame-title-cache))
+         (now (float-time)))
+    (if (and cached (< (- now (car cached)) 3))
+        (cdr cached)
+      (let ((title
+             (condition-case nil
+                 (let* (;; Avoid starting remote connections during redisplay.
+                        (remote (file-remote-p directory))
+                        (project (unless remote (project-current nil directory)))
+                        (name (if project (project-name project)
+                                (file-name-nondirectory
+                                 (directory-file-name directory))))
+                        (root (unless remote (vc-git-root directory)))
+                        (branch (when root (my/frame-title-git-branch root))))
+                   (if branch (concat name " · ⎇ " branch) name))
+               (error "Emacs"))))
+        (puthash directory (cons now title) my/frame-title-cache)
+        title))))
+
+(clrhash my/frame-title-cache)
+(setq frame-title-format '(:eval (my/frame-title)))
+(force-mode-line-update t)
+
+;; A real window divider spans header/tab lines as well as buffer text.
+(setq window-divider-default-places 'right-only
+      window-divider-default-right-width 1)
+(custom-theme-set-faces
+ 'user
+ '(window-divider
+   ((((background light)) :foreground "#C7CBD1")
+    (((background dark)) :foreground "#484E58")))
+ '(window-divider-first-pixel ((t :inherit window-divider)))
+ '(window-divider-last-pixel ((t :inherit window-divider))))
+(window-divider-mode 1)
+
+;; Keep directory buffers unnumbered, including when reloading this file.
+(defun my/line-numbers-exclude-dired ()
+  "Keep line numbers disabled in Dired and Dirvish buffers."
+  (when (and display-line-numbers-mode (derived-mode-p 'dired-mode))
+    (display-line-numbers-mode -1)))
+(add-hook 'display-line-numbers-mode-hook #'my/line-numbers-exclude-dired)
+
+;; 全局显示行号（目录缓冲区除外）
 (global-display-line-numbers-mode 1)
 ;; 列号
 (column-number-mode t)
@@ -46,42 +122,13 @@
 (tool-bar-mode -1)
 (scroll-bar-mode -1)
 
-;; Flat buffer tabs, using the same font size as the editor.
+;; Shared header metrics for buffer tabs and the Dirvish sidebar.
 (defvar my/ui-header-height 1.4
   "Shared height of buffer tabs and the Dirvish sidebar title, in font units.")
 
 (defun my/ui-header-space (width)
   "Return a spacer display specification with WIDTH and shared header height."
   `(space :width ,width :height ,my/ui-header-height :ascent 75))
-
-(defun my/tab-line-format-with-padding (tab tabs)
-  "Add clickable padding around the standard TAB label and close button."
-  (let* ((label (tab-line-tab-name-format-default tab tabs))
-         (padding (apply #'propertize " " (text-properties-at 0 label))))
-    ;; Share the vertical strut with Dirvish; keep the label font unchanged.
-    (put-text-property 0 1 'display
-                       (my/ui-header-space 1.2) padding)
-    (concat padding label padding)))
-
-(with-eval-after-load 'tab-line
-  (setq tab-line-tab-name-format-function #'my/tab-line-format-with-padding)
-  (custom-theme-set-faces
-   'user
-   '(tab-line
-     ((((background light)) :inherit default :height 1.0 :box nil :background "#F3F4F5")
-      (((background dark)) :inherit default :height 1.0 :box nil :background "#25282D")))
-   '(tab-line-tab
-     ((t :inherit tab-line :box nil :weight normal)))
-   '(tab-line-tab-inactive
-     ((((background light)) :inherit tab-line-tab :box nil :foreground "#555B63" :background "#F3F4F5")
-      (((background dark)) :inherit tab-line-tab :box nil :foreground "#B8BEC7" :background "#25282D")))
-   '(tab-line-tab-current
-     ((((background light)) :inherit tab-line-tab :box nil :weight bold :foreground "#245FA5" :background "#E3ECFA")
-      (((background dark)) :inherit tab-line-tab :box nil :weight bold :foreground "#A8CFFF" :background "#33445C")))
-   '(tab-line-highlight
-     ((((background light)) :box nil :background "#E7E9ED" :foreground "#20252B")
-      (((background dark)) :box nil :background "#3A3F47" :foreground "#F0F2F5"))))
-  (tab-line-force-update t))
 
 ;;(set-frame-parameter (selected-frame)
 ;;                     'internal-border-width 0)

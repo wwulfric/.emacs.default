@@ -75,6 +75,23 @@
  '(window-divider-last-pixel ((t :inherit window-divider))))
 (window-divider-mode 1)
 
+;; Flat, quiet status bars without the theme's raised or sunken border.
+(custom-theme-set-faces
+ 'user
+ '(mode-line
+   ((((background light)) :background "#ECEEF0" :foreground "#454B53"
+     :box nil :overline nil :underline nil :inverse-video nil :weight normal)
+    (((background dark)) :background "#292D33" :foreground "#C4CAD2"
+     :box nil :overline nil :underline nil :inverse-video nil :weight normal)))
+ '(mode-line-active
+   ((t :inherit mode-line :background unspecified :foreground unspecified
+       :box nil :overline nil :underline nil :inverse-video nil :weight normal)))
+ '(mode-line-inactive
+   ((((background light)) :inherit mode-line :background "#F5F6F7" :foreground "#747B84"
+     :box nil :overline nil :underline nil :inverse-video nil :weight normal)
+    (((background dark)) :inherit mode-line :background "#22252A" :foreground "#9199A4"
+     :box nil :overline nil :underline nil :inverse-video nil :weight normal))))
+
 ;; Keep directory buffers unnumbered, including when reloading this file.
 (defun my/line-numbers-exclude-dired ()
   "Keep line numbers disabled in Dired and Dirvish buffers."

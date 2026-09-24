@@ -60,6 +60,9 @@
 (advice-add 'lsp-bridge-define--jump :around #'my/lsp-click-maybe-peek)
 (define-key lsp-bridge-mode-map (kbd "<s-down-mouse-1>") #'ignore)
 (define-key lsp-bridge-mode-map (kbd "<s-mouse-1>") #'my/lsp-click)
+;; Read-only dependency sources use the same gesture without starting HLS.
+(define-key lsp-bridge-source-mode-map (kbd "<s-down-mouse-1>") #'ignore)
+(define-key lsp-bridge-source-mode-map (kbd "<s-mouse-1>") #'my/lsp-click)
 
 (global-lsp-bridge-mode)
 ;; (setq lsp-bridge-enable-hover-diagnostic t)
@@ -75,9 +78,6 @@
 ;; haskell
 (require 'haskell-mode-autoloads)
 (setq lsp-bridge-source-enable t)
-;; The fork now owns external source fallback; keep Cmd-click above unchanged.
-(remove-hook 'haskell-mode-hook #'my-haskell-source-setup)
-(remove-hook 'haskell-ts-mode-hook #'my-haskell-source-setup)
 
 ;; markdown
 (require 'markdown-ts-mode)

@@ -15,7 +15,7 @@
 	url = https://github.com/wwulfric/emacs-chinese-word-segmentation.git
 [submodule "lisp/lsp-bridge"]
 	path = lisp/lsp-bridge
-	url = https://github.com/manateelazycat/lsp-bridge
+	url = git@github.com:wwulfric/lsp-bridge.git
 [submodule "lisp/posframe"]
 	path = lisp/posframe
 	url = https://github.com/tumashu/posframe

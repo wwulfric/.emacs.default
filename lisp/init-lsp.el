@@ -62,7 +62,7 @@
 (define-key lsp-bridge-mode-map (kbd "<s-mouse-1>") #'my/lsp-click)
 
 (global-lsp-bridge-mode)
-;;(setq lsp-bridge-enable-hover-diagnostic t)
+;; (setq lsp-bridge-enable-hover-diagnostic t)
 
 ;; python
 (setq lsp-bridge-python-lsp-server "ruff")
@@ -74,6 +74,10 @@
 
 ;; haskell
 (require 'haskell-mode-autoloads)
+(setq lsp-bridge-source-enable t)
+;; The fork now owns external source fallback; keep Cmd-click above unchanged.
+(remove-hook 'haskell-mode-hook #'my-haskell-source-setup)
+(remove-hook 'haskell-ts-mode-hook #'my-haskell-source-setup)
 
 ;; markdown
 (require 'markdown-ts-mode)

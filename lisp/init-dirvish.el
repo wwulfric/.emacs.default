@@ -100,6 +100,8 @@ Outside the sidebar, preserve Dired's usual mouse behavior."
   (display-line-numbers-mode -1)
   (when-let* ((session (dirvish-curr))
               ((eq (dv-type session) 'side)))
+    ;; Follow the buffer's normal text face, including after theme changes.
+    (face-remap-set-base 'dired-directory 'default)
     ;; The sidebar already has its project header; its internal buffer is no tab.
     (setq-local tab-line-exclude t)
     (when (bound-and-true-p tab-line-mode) (tab-line-mode -1))
@@ -153,7 +155,16 @@ Outside the sidebar, preserve Dired's usual mouse behavior."
           (with-selected-window window
             (unless (equal directory default-directory)
               (dirvish--find-entry 'find-alternate-file directory)))
-        (dirvish-side directory)))
+        ;; Dirvish automatically expands the calling buffer's file.  An
+        ;; external dependency source cannot be located in this project tree.
+        (let ((buffer-file-name
+               (and buffer-file-name
+                    (string-prefix-p directory (expand-file-name buffer-file-name))
+                    buffer-file-name)))
+          (dirvish-side directory))))
+    ;; Dirvish's pre-redisplay hook only renders the selected window.  This
+    ;; helper leaves focus in the editor, so paint the sidebar explicitly.
+    (my/dirvish-refresh-focus (selected-frame))
     (set-frame-parameter nil 'my/dirvish-directory directory)))
 
 (defun my/dirvish-toggle ()

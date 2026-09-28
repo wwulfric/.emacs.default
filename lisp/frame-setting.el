@@ -39,7 +39,9 @@
 
 (defun my/frame-title ()
   "Show the current project and Git branch, without repeating the tab name."
-  (let* ((directory default-directory)
+  (let* ((directory (or (and (fboundp 'lsp-bridge-source-origin-directory)
+                            (lsp-bridge-source-origin-directory))
+                       default-directory))
          (cached (gethash directory my/frame-title-cache))
          (now (float-time)))
     (if (and cached (< (- now (car cached)) 3))
@@ -60,6 +62,15 @@
         title))))
 
 (clrhash my/frame-title-cache)
+(defun my/frame-title-source-refresh ()
+  "Refresh the title when an external source buffer changes origin or mode."
+  (clrhash my/frame-title-cache)
+  (force-mode-line-update t))
+
+(with-eval-after-load 'lsp-bridge-source
+  (add-hook 'lsp-bridge-source-context-update-hook #'my/frame-title-source-refresh)
+  (add-hook 'lsp-bridge-source-mode-hook #'my/frame-title-source-refresh))
+
 (setq frame-title-format '(:eval (my/frame-title)))
 (force-mode-line-update t)
 

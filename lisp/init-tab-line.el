@@ -67,6 +67,18 @@ Process buffers can be created without running a major-mode hook."
       (setq my/tab-line-hover-timer nil
             my/tab-line-hover-target nil)))))
 
+(defface my/tab-line-source
+  '((((background light)) :background "#EDF2EA")
+    (((background dark)) :background "#2C342D"))
+  "Subtle background for external source tabs."
+  :group 'tab-line)
+
+(defface my/tab-line-source-current
+  '((((background light)) :background "#DCE8D6")
+    (((background dark)) :background "#3B4D3D"))
+  "Selected external source tab background; retain normal selection text."
+  :group 'tab-line)
+
 (defun my/tab-line-format-with-padding (tab tabs)
   "Add clickable padding around the standard TAB label and close button."
   (let* ((selected (if (bufferp tab) (eq tab (window-buffer))
@@ -83,13 +95,42 @@ Process buffers can be created without running a major-mode hook."
                       'help-echo (if show-close "Click to close tab" "Click to select tab")
                       'follow-link 'ignore))
          (label (tab-line-tab-name-format-default tab tabs))
-         (padding (apply #'propertize " " (text-properties-at 0 label))))
+         padding)
+    (when (and (bufferp tab)
+               (fboundp 'lsp-bridge-source-buffer-p)
+               (lsp-bridge-source-buffer-p tab))
+      ;; Decorate after the standard formatter, which overwrites name faces
+      ;; and help text.  Leave the close button's tooltip/keymap intact.
+      (let ((end (- (length label) (length tab-line-close-button))))
+        (with-current-buffer tab
+          (put-text-property
+           0 end 'help-echo
+           (format "依赖源码（只读）\n来源：%s\n文件：%s"
+                   (or (lsp-bridge-source-origin-directory) "未知项目")
+                   buffer-file-name)
+           label))
+        (add-face-text-property
+         0 (length label)
+         (if (and selected (mode-line-window-selected-p))
+             'my/tab-line-source-current
+           'my/tab-line-source)
+         nil label)))
+    (setq padding (apply #'propertize " " (text-properties-at 0 label)))
     ;; Share the vertical strut with Dirvish; keep the label font unchanged.
     (put-text-property 0 1 'display
                        (my/ui-header-space 1.2) padding)
     (concat padding label padding)))
 
+(defun my/tab-line-source-refresh ()
+  "Refresh source tab appearance and origin tooltips in all windows."
+  (tab-line-force-update t))
+
+(with-eval-after-load 'lsp-bridge-source
+  (add-hook 'lsp-bridge-source-context-update-hook #'my/tab-line-source-refresh)
+  (add-hook 'lsp-bridge-source-mode-hook #'my/tab-line-source-refresh))
+
 (with-eval-after-load 'tab-line
+  (setq tab-line-tab-name-function #'tab-line-tab-name-buffer)
   (setq tab-line-tab-name-format-function #'my/tab-line-format-with-padding)
   (add-hook 'tab-line-mode-hook #'my/tab-line-manage-hover-timer)
   (add-hook 'global-tab-line-mode-hook #'my/tab-line-manage-hover-timer)

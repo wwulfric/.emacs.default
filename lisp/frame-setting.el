@@ -4,8 +4,14 @@
 (setq default-frame-alist
       (append (list '(width  . 100) '(height . 50)
                     '(vertical-scroll-bars . nil)
-                    '(internal-border-width . 0)
+                    '(internal-border-width . 6)
                     '(font . "PT Mono 14"))))
+
+;; Apply the preview spacing to existing top-level GUI frames on reload.
+;; Completion and input-method child frames keep their own borders.
+(dolist (frame (frame-list))
+  (when (and (display-graphic-p frame) (not (frame-parent frame)))
+    (set-frame-parameter frame 'internal-border-width 6)))
 
 ;; Restore the native title bar and macOS traffic-light buttons on reload.
 (when (eq system-type 'darwin)
@@ -103,15 +109,20 @@
     (((background dark)) :inherit mode-line :background "#22252A" :foreground "#9199A4"
      :box nil :overline nil :underline nil :inverse-video nil :weight normal))))
 
-;; Keep directory buffers unnumbered, including when reloading this file.
-(defun my/line-numbers-exclude-dired ()
-  "Keep line numbers disabled in Dired and Dirvish buffers."
-  (when (and display-line-numbers-mode (derived-mode-p 'dired-mode))
-    (display-line-numbers-mode -1)))
-(add-hook 'display-line-numbers-mode-hook #'my/line-numbers-exclude-dired)
+;; Number code buffers only; reading and utility buffers stay uncluttered.
+;; Remove the previous global policy when this file is reloaded.
+(remove-hook 'display-line-numbers-mode-hook #'my/line-numbers-exclude-dired)
+(global-display-line-numbers-mode -1)
 
-;; 全局显示行号（目录缓冲区除外）
-(global-display-line-numbers-mode 1)
+(defun my/prog-line-numbers ()
+  "Enable line numbers in programming buffers."
+  (display-line-numbers-mode 1))
+(add-hook 'prog-mode-hook #'my/prog-line-numbers)
+
+;; Apply the policy to buffers which are already open during a preview.
+(dolist (buffer (buffer-list))
+  (with-current-buffer buffer
+    (display-line-numbers-mode (if (derived-mode-p 'prog-mode) 1 -1))))
 ;; 列号
 (column-number-mode t)
 
@@ -157,9 +168,6 @@
 (defun my/ui-header-space (width)
   "Return a spacer display specification with WIDTH and shared header height."
   `(space :width ,width :height ,my/ui-header-height :ascent 75))
-
-;;(set-frame-parameter (selected-frame)
-;;                     'internal-border-width 0)
 
 ;; Line spacing, can be 0 for code and 1 or 2 for text
 ;; (setq-default line-spacing nil)

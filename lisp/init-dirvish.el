@@ -33,20 +33,7 @@
 (with-eval-after-load 'dirvish-widgets
   (advice-add 'dirvish-project-ml :filter-return #'my/dirvish-pad-project-title))
 
-;; Subtle selection colors, distinct when focus returns to the editor.
-;; Avoid inheriting the theme's stronger highlight/region backgrounds.
-(custom-set-faces
- '(dirvish-hl-line
-   ((((class color) (background light))
-     (:inherit nil :background "#E3ECFA" :extend t))
-    (((class color) (background dark))
-     (:inherit nil :background "#303D50" :extend t))))
- '(dirvish-hl-line-inactive
-   ((((class color) (background light))
-     (:inherit nil :background "#ECEDEF" :extend t))
-    (((class color) (background dark))
-     (:inherit nil :background "#303236" :extend t)))))
-
+;; Selection colors are supplied by ink-theme.el.
 (setq dirvish-side-width 30
       dirvish-side-attributes '(subtree-state)
       dirvish-side-auto-expand t)

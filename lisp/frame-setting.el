@@ -83,31 +83,7 @@
 ;; A real window divider spans header/tab lines as well as buffer text.
 (setq window-divider-default-places 'right-only
       window-divider-default-right-width 1)
-(custom-theme-set-faces
- 'user
- '(window-divider
-   ((((background light)) :foreground "#C7CBD1")
-    (((background dark)) :foreground "#484E58")))
- '(window-divider-first-pixel ((t :inherit window-divider)))
- '(window-divider-last-pixel ((t :inherit window-divider))))
 (window-divider-mode 1)
-
-;; Flat, quiet status bars without the theme's raised or sunken border.
-(custom-theme-set-faces
- 'user
- '(mode-line
-   ((((background light)) :background "#ECEEF0" :foreground "#454B53"
-     :box nil :overline nil :underline nil :inverse-video nil :weight normal)
-    (((background dark)) :background "#292D33" :foreground "#C4CAD2"
-     :box nil :overline nil :underline nil :inverse-video nil :weight normal)))
- '(mode-line-active
-   ((t :inherit mode-line :background unspecified :foreground unspecified
-       :box nil :overline nil :underline nil :inverse-video nil :weight normal)))
- '(mode-line-inactive
-   ((((background light)) :inherit mode-line :background "#F5F6F7" :foreground "#747B84"
-     :box nil :overline nil :underline nil :inverse-video nil :weight normal)
-    (((background dark)) :inherit mode-line :background "#22252A" :foreground "#9199A4"
-     :box nil :overline nil :underline nil :inverse-video nil :weight normal))))
 
 ;; Number code buffers only; reading and utility buffers stay uncluttered.
 ;; Remove the previous global policy when this file is reloaded.
@@ -194,7 +170,7 @@
 (fringe-mode '(0 . 0))
 
 (defface fallback '((t :family "Fira Code"
-                       :inherit 'face-faded))
+                       :inherit shadow))
   "Fallback")
 
 (set-display-table-slot standard-display-table 'truncation

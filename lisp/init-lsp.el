@@ -6,6 +6,18 @@
 
 (require 'lsp-bridge)
 
+;; ACM normally regenerates popup colors after load-theme (and daemon frame
+;; creation).  Let Ink's explicit faces win while it is the active top theme.
+(defun my/acm-init-theme-colors (original &optional force)
+  "Preserve Ink's popup palette when ORIGINAL is asked to FORCE a reset."
+  (if (and force (eq (car custom-enabled-themes) 'ink))
+      (dolist (frame (frame-list))
+        (dolist (face '(acm-frame-default-face acm-frame-border-face
+                       acm-frame-select-face))
+          (face-spec-recalc face frame)))
+    (funcall original force)))
+(advice-add 'acm-frame-init-colors :around #'my/acm-init-theme-colors)
+
 ;; Keep local language-server settings outside the vendored lsp-bridge tree.
 (setq lsp-bridge-user-langserver-dir
       (expand-file-name "langserver" (file-name-directory

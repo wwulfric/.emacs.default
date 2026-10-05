@@ -37,7 +37,9 @@
 (require 'init-fingertip)
 (require 'init-treesit)
 (require 'init-emacs-rime)
-;(require 'ink-theme)
+;; Ink owns face styling; component configs own layout and interaction.
+(add-to-list 'custom-theme-load-path (expand-file-name "lisp" user-emacs-directory))
+(load-theme 'ink t)
 (require 'init-jieba-word)
 (require 'init-lsp)
 (require 'init-navigation)

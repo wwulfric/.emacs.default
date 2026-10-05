@@ -68,15 +68,13 @@ Process buffers can be created without running a major-mode hook."
             my/tab-line-hover-target nil)))))
 
 (defface my/tab-line-source
-  '((((background light)) :background "#EDF2EA")
-    (((background dark)) :background "#2C342D"))
-  "Subtle background for external source tabs."
+  '((t (:inherit tab-line-tab)))
+  "External source tab; colors are supplied by the active theme."
   :group 'tab-line)
 
 (defface my/tab-line-source-current
-  '((((background light)) :background "#DCE8D6")
-    (((background dark)) :background "#3B4D3D"))
-  "Selected external source tab background; retain normal selection text."
+  '((t (:inherit tab-line-tab-current)))
+  "Selected external source tab; colors are supplied by the active theme."
   :group 'tab-line)
 
 (defun my/tab-line-format-with-padding (tab tabs)
@@ -135,22 +133,6 @@ Process buffers can be created without running a major-mode hook."
   (add-hook 'tab-line-mode-hook #'my/tab-line-manage-hover-timer)
   (add-hook 'global-tab-line-mode-hook #'my/tab-line-manage-hover-timer)
   (my/tab-line-manage-hover-timer)
-  (custom-theme-set-faces
-   'user
-   '(tab-line
-     ((((background light)) :inherit default :height 1.0 :box nil :background "#F3F4F5")
-      (((background dark)) :inherit default :height 1.0 :box nil :background "#25282D")))
-   '(tab-line-tab
-     ((t :inherit tab-line :box nil :weight normal)))
-   '(tab-line-tab-inactive
-     ((((background light)) :inherit tab-line-tab :box nil :foreground "#555B63" :background "#F3F4F5")
-      (((background dark)) :inherit tab-line-tab :box nil :foreground "#B8BEC7" :background "#25282D")))
-   '(tab-line-tab-current
-     ((((background light)) :inherit tab-line-tab :box nil :weight bold :foreground "#245FA5" :background "#E3ECFA")
-      (((background dark)) :inherit tab-line-tab :box nil :weight bold :foreground "#A8CFFF" :background "#33445C")))
-   '(tab-line-highlight
-     ((((background light)) :box nil :background "#E7E9ED" :foreground "#20252B")
-      (((background dark)) :box nil :background "#3A3F47" :foreground "#F0F2F5"))))
   (tab-line-force-update t))
 
 (global-tab-line-mode 1)

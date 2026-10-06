@@ -1,5 +1,4 @@
-;; -*- lexical-binding: t; -*-
-
+;;; frame-setting.el --- Frame and window appearance -*- lexical-binding: t; -*-
 
 (defconst my/ui-space-small 6 "Small UI spacing unit, in pixels.")
 (defconst my/ui-editor-padding (* 4 my/ui-space-small)
@@ -84,9 +83,6 @@
 
 ;; 退出时自动保存当前光标的位置，并在下次打开相应文件时自动将光标定位到上一次的位置
 ;; (save-place-mode 1)
-
-;; 进行缩进时不使用制表符（Tab）字符，而是使用空格字符进行缩进
-(setq-default indent-tabs-mode nil)
 
 (menu-bar-mode -1)     ; 隐藏菜单栏
 (tool-bar-mode -1)
@@ -176,28 +172,8 @@ reading margins remain independent."
 (set-display-table-slot standard-display-table 'selective-display
                         (string-to-vector " …"))
 
-;; yes or no
-(setq original-y-or-n-p 'y-or-n-p)
-(fset 'yes-or-no-p 'y-or-n-p)
-
-
 ;; 以16进制显示字节数
 (setq display-raw-bytes-as-hex t)
-
-
-;; ido mode
-(require 'flx-ido)
-(ido-mode 1)
-(ido-everywhere 1)
-(flx-ido-mode 1)
-;; disable ido faces to see flx highlights.
-(setq ido-enable-flex-matching t)
-(setq ido-use-faces nil)
-
-;; auto save
-(require 'auto-save)
-(auto-save-enable)
-(setq auto-save-silent t)
 
 
 (provide 'frame-setting)

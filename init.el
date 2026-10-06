@@ -17,6 +17,8 @@
     (add-to-list 'load-path dir)
     (normal-top-level-add-subdirs-to-load-path)))
 (add-subdirs-to-load-path emacs-root-dir)
+;; Personal display configuration lives together; vendor paths stay unchanged.
+(add-to-list 'load-path (expand-file-name "ui" emacs-root-dir))
 
 
 ;; smex
@@ -30,6 +32,23 @@
 
 
 (require 'global-shortkeys)
+;; Editing defaults and completion are independent of the visual theme.
+(setq-default indent-tabs-mode nil)
+(setq original-y-or-n-p 'y-or-n-p)
+(fset 'yes-or-no-p 'y-or-n-p)
+
+(require 'flx-ido)
+(ido-mode 1)
+(ido-everywhere 1)
+(flx-ido-mode 1)
+(setq ido-enable-flex-matching t
+      ido-use-faces nil)
+
+(require 'auto-save)
+(auto-save-enable)
+(setq auto-save-silent t)
+
+;; Frames, typography, tabs and sidebar.
 (require 'frame-setting)
 (require 'init-tab-line)
 (require 'init-dirvish)
@@ -39,7 +58,7 @@
 (require 'init-writing)
 (require 'init-emacs-rime)
 ;; Ink owns face styling; component configs own layout and interaction.
-(add-to-list 'custom-theme-load-path (expand-file-name "lisp" user-emacs-directory))
+(add-to-list 'custom-theme-load-path (expand-file-name "ui" emacs-root-dir))
 (load-theme 'ink t)
 (require 'init-jieba-word)
 (require 'init-lsp)

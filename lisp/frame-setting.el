@@ -1,17 +1,27 @@
 ;; -*- lexical-binding: t; -*-
 
 
-(setq default-frame-alist
-      (append (list '(width  . 100) '(height . 50)
-                    '(vertical-scroll-bars . nil)
-                    '(internal-border-width . 6)
-                    '(font . "PT Mono 14"))))
+(defconst my/ui-space-small 6 "Small UI spacing unit, in pixels.")
+(defconst my/ui-editor-padding (* 4 my/ui-space-small)
+  "Shared 24-pixel text padding for code and prose windows.")
 
-;; Apply the preview spacing to existing top-level GUI frames on reload.
+(dolist (parameter `((width . 100) (height . 50)
+                     (vertical-scroll-bars . nil)
+                     (internal-border-width . 0)
+                     (font . "PT Mono 14")))
+  (setf (alist-get (car parameter) default-frame-alist) (cdr parameter)))
+
+;; Window chrome reaches the frame edges; each content area owns its padding.
 ;; Completion and input-method child frames keep their own borders.
-(dolist (frame (frame-list))
+(defun my/frame-apply-spacing (frame)
+  "Remove the outer border of GUI FRAME, leaving popup geometry alone."
   (when (and (display-graphic-p frame) (not (frame-parent frame)))
-    (set-frame-parameter frame 'internal-border-width 6)))
+    (set-frame-parameter frame 'internal-border-width 0)))
+(add-hook 'after-make-frame-functions #'my/frame-apply-spacing)
+(dolist (frame (frame-list))
+  (my/frame-apply-spacing frame))
+
+(require 'init-typography)
 
 ;; Restore the native title bar and macOS traffic-light buttons on reload.
 (when (eq system-type 'darwin)
@@ -23,62 +33,7 @@
       (modify-frame-parameters frame '((undecorated-round . nil)
                                        (undecorated . nil))))))
 
-(require 'project)
-(require 'vc-git)
-
-(defvar my/frame-title-cache (make-hash-table :test #'equal)
-  "Directory to (timestamp . title); avoid Git calls on every redisplay.")
-
-(defun my/frame-title-git-branch (directory)
-  "Return DIRECTORY's Git branch, or a short revision for detached HEAD."
-  (let ((default-directory directory))
-    (with-temp-buffer
-      (cond
-       ((zerop (process-file "git" nil '(t nil) nil
-                             "symbolic-ref" "--quiet" "--short" "HEAD"))
-        (string-trim (buffer-string)))
-       (t
-        (erase-buffer)
-        (when (zerop (process-file "git" nil '(t nil) nil
-                                   "rev-parse" "--short" "HEAD"))
-          (concat "detached " (string-trim (buffer-string)))))))))
-
-(defun my/frame-title ()
-  "Show the current project and Git branch, without repeating the tab name."
-  (let* ((directory (or (and (fboundp 'lsp-bridge-source-origin-directory)
-                            (lsp-bridge-source-origin-directory))
-                       default-directory))
-         (cached (gethash directory my/frame-title-cache))
-         (now (float-time)))
-    (if (and cached (< (- now (car cached)) 3))
-        (cdr cached)
-      (let ((title
-             (condition-case nil
-                 (let* (;; Avoid starting remote connections during redisplay.
-                        (remote (file-remote-p directory))
-                        (project (unless remote (project-current nil directory)))
-                        (name (if project (project-name project)
-                                (file-name-nondirectory
-                                 (directory-file-name directory))))
-                        (root (unless remote (vc-git-root directory)))
-                        (branch (when root (my/frame-title-git-branch root))))
-                   (if branch (concat name " · ⎇ " branch) name))
-               (error "Emacs"))))
-        (puthash directory (cons now title) my/frame-title-cache)
-        title))))
-
-(clrhash my/frame-title-cache)
-(defun my/frame-title-source-refresh ()
-  "Refresh the title when an external source buffer changes origin or mode."
-  (clrhash my/frame-title-cache)
-  (force-mode-line-update t))
-
-(with-eval-after-load 'lsp-bridge-source
-  (add-hook 'lsp-bridge-source-context-update-hook #'my/frame-title-source-refresh)
-  (add-hook 'lsp-bridge-source-mode-hook #'my/frame-title-source-refresh))
-
-(setq frame-title-format '(:eval (my/frame-title)))
-(force-mode-line-update t)
+(require 'init-frame-title)
 
 ;; A real window divider spans header/tab lines as well as buffer text.
 (setq window-divider-default-places 'right-only
@@ -95,7 +50,7 @@
   (display-line-numbers-mode 1))
 (add-hook 'prog-mode-hook #'my/prog-line-numbers)
 
-;; Apply the policy to buffers which are already open during a preview.
+;; Apply the policy to buffers which are already open during a reload.
 (dolist (buffer (buffer-list))
   (with-current-buffer buffer
     (display-line-numbers-mode (if (derived-mode-p 'prog-mode) 1 -1))))
@@ -145,6 +100,19 @@
   "Return a spacer display specification with WIDTH and shared header height."
   `(space :width ,width :height ,my/ui-header-height :ascent 75))
 
+(defvar my/ui-mode-line-height 1.4
+  "Minimum status-bar height in fixed-pitch font units.")
+
+(defun my/ui-mode-line-space (width)
+  "Return a WIDTH-column spacer keeping status bars level across windows."
+  (propertize " " 'face 'fixed-pitch
+              'display `(space :width ,width
+                               :height ,my/ui-mode-line-height :ascent 80)))
+
+;; Reserve the same height even when only one status bar contains CJK text.
+(setq mode-line-front-space
+      '(:eval (if (display-graphic-p) (my/ui-mode-line-space 1) "-")))
+
 ;; Line spacing, can be 0 for code and 1 or 2 for text
 ;; (setq-default line-spacing nil)
 ;; (setq-default default-text-properties '(line-spacing 0.25 line-height 1.25))
@@ -166,8 +134,36 @@
 
 
 
-;; 去除两侧边缘条（展示换行符等）No fringe but nice glyphs for truncated and wrapped lines
+;; Dirvish owns its compact fringes; editor windows get their own text padding.
 (fringe-mode '(0 . 0))
+
+(defun my/frame-apply-window-padding (frame)
+  "Pad editor text on GUI FRAME independently of sidebars and splits.
+Fringes reserve the same space at exterior and interior edges, so opening
+or closing Dirvish cannot remove or double it.  Tabs stay flush and optional
+reading margins remain independent."
+  (when (and (display-graphic-p frame) (not (frame-parent frame)))
+    (dolist (window (window-list frame 'no-minibuffer))
+      (with-current-buffer (window-buffer window)
+        ;; Dirvish and other side windows manage their own fringes.
+        (unless (or (window-parameter window 'window-side)
+                    (derived-mode-p 'dired-mode)
+                    (string-prefix-p " " (buffer-name)))
+          (let* (;; Use buffer/frame defaults, never inherited split-window
+                 ;; fringes, to avoid accumulating padding across changes.
+                 (left (max (or left-fringe-width
+                                (frame-parameter frame 'left-fringe) 0)
+                            my/ui-editor-padding))
+                 (right (max (or right-fringe-width
+                                 (frame-parameter frame 'right-fringe) 0)
+                             my/ui-editor-padding))
+                 (desired (list left right t nil)))
+            (unless (equal (window-fringes window) desired)
+              (apply #'set-window-fringes window desired))))))))
+
+(add-hook 'window-state-change-functions #'my/frame-apply-window-padding -10)
+(dolist (frame (frame-list))
+  (my/frame-apply-window-padding frame))
 
 (defface fallback '((t :family "Fira Code"
                        :inherit shadow))

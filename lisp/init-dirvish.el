@@ -17,6 +17,16 @@
 ;; A width of 0 merely hides the image and still reserves its fixed height.
 (setq dirvish-mode-line-bar-image-width nil)
 
+(dirvish-define-mode-line my-height
+  "Use the editor's status-bar height without adding horizontal padding."
+  (when (display-graphic-p) (my/ui-mode-line-space 0)))
+
+(setq dirvish-side-mode-line-format
+      (plist-put (copy-sequence dirvish-side-mode-line-format) :left
+                 (cons 'my-height
+                       (remq 'my-height
+                             (plist-get dirvish-side-mode-line-format :left)))))
+
 ;; Share tab-line's font metrics and vertical padding, only in the sidebar.
 (require 'face-remap)
 (defvar-local my/dirvish-header-face-cookie nil)
@@ -110,7 +120,15 @@ Outside the sidebar, preserve Dired's usual mouse behavior."
 (dolist (buffer (buffer-list))
   (with-current-buffer buffer
     (when (derived-mode-p 'dired-mode)
-      (my/dirvish-setup))))
+      (my/dirvish-setup)
+      (when-let* ((session (dirvish-curr))
+                  ((eq (dv-type session) 'side)))
+        ;; Sessions cache their composed status bar; refresh it on reload too.
+        (setf (dv-mode-line session)
+              (dirvish--mode-line-composer
+               (plist-get dirvish-side-mode-line-format :left)
+               (plist-get dirvish-side-mode-line-format :right)))
+        (dirvish--setup-mode-line session)))))
 (force-mode-line-update t)
 
 (defun my/dirvish-refresh-focus (frame)

@@ -33,39 +33,63 @@ Process buffers can be created without running a major-mode hook."
   "Window and tab currently under the mouse.")
 (defvar my/tab-line-hover-timer nil)
 
+(defun my/tab-line-hover-active-p ()
+  "Return non-nil when Emacs has focus and a visible GUI tab strip."
+  (let (focused visible-tabs)
+    (dolist (frame (frame-list))
+      (when (and (display-graphic-p frame)
+                 (not (frame-parent frame))
+                 (eq (frame-visible-p frame) t))
+        ;; Completion/input child frames do not represent application focus.
+        ;; `unknown' keeps hover working on backends without focus tracking.
+        (setq focused (or focused (frame-focus-state frame)))
+        (unless visible-tabs
+          (setq visible-tabs
+                (seq-some
+                 (lambda (window)
+                   (with-current-buffer (window-buffer window)
+                     (and tab-line-mode tab-line-format)))
+                 (window-list frame 'no-minibuffer))))))
+    (and focused visible-tabs)))
+
+(defun my/tab-line-stop-hover-timer ()
+  "Stop polling and clear any stale hovered tab."
+  (when (timerp my/tab-line-hover-timer)
+    (cancel-timer my/tab-line-hover-timer))
+  (setq my/tab-line-hover-timer nil)
+  (when my/tab-line-hover-target
+    (setq my/tab-line-hover-target nil)
+    (tab-line-force-update t)))
+
 (defun my/tab-line-update-hover ()
   "Refresh tab buttons only when the mouse enters or leaves a tab."
-  (let* ((mouse (mouse-pixel-position))
-         (frame (car mouse))
-         (xy (cdr mouse))
-         (position (when (and (frame-live-p frame)
-                              (integerp (car xy)) (integerp (cdr xy))
-                              (<= 0 (car xy)) (<= 0 (cdr xy))
-                              (< (car xy) (frame-pixel-width frame))
-                              (< (cdr xy) (frame-pixel-height frame)))
-                     (posn-at-x-y (car xy) (cdr xy) frame)))
-         (string (and position (posn-string position)))
-         (tab (and position (eq (posn-area position) 'tab-line) string
-                   (get-text-property (cdr string) 'tab (car string))))
-         (target (and tab (cons (posn-window position) tab))))
-    (unless (equal target my/tab-line-hover-target)
-      (setq my/tab-line-hover-target target)
-      (tab-line-force-update t))))
+  ;; Also stop if a frame was hidden without a focus notification.
+  (if (not (my/tab-line-hover-active-p))
+      (my/tab-line-stop-hover-timer)
+    (let* ((mouse (mouse-pixel-position))
+           (frame (car mouse))
+           (xy (cdr mouse))
+           (position (when (and (frame-live-p frame)
+                                (integerp (car xy)) (integerp (cdr xy))
+                                (<= 0 (car xy)) (<= 0 (cdr xy))
+                                (< (car xy) (frame-pixel-width frame))
+                                (< (cdr xy) (frame-pixel-height frame)))
+                       (posn-at-x-y (car xy) (cdr xy) frame)))
+           (string (and position (posn-string position)))
+           (tab (and position (eq (posn-area position) 'tab-line) string
+                     (get-text-property (cdr string) 'tab (car string))))
+           (target (and tab (cons (posn-window position) tab))))
+      (unless (equal target my/tab-line-hover-target)
+        (setq my/tab-line-hover-target target)
+        (tab-line-force-update t)))))
 
-(defun my/tab-line-manage-hover-timer ()
-  "Track hover while at least one buffer uses Tab-Line mode."
-  (let ((enabled (seq-some
-                  (lambda (buffer) (buffer-local-value 'tab-line-mode buffer))
-                  (buffer-list))))
-    (cond
-     ((and enabled (not (timerp my/tab-line-hover-timer)))
-      (setq my/tab-line-hover-timer
-            (run-with-timer 0 0.1 #'my/tab-line-update-hover)))
-     ((not enabled)
-      (when (timerp my/tab-line-hover-timer)
-        (cancel-timer my/tab-line-hover-timer))
-      (setq my/tab-line-hover-timer nil
-            my/tab-line-hover-target nil)))))
+(defun my/tab-line-manage-hover-timer (&optional _frame)
+  "Track hover only while visible tabs can receive mouse interaction."
+  (if (my/tab-line-hover-active-p)
+      (unless (timerp my/tab-line-hover-timer)
+        (setq my/tab-line-hover-timer
+              (run-with-timer 0 0.2 #'my/tab-line-update-hover)))
+    (my/tab-line-stop-hover-timer)))
 
 (defface my/tab-line-source
   '((t (:inherit tab-line-tab)))
@@ -128,10 +152,18 @@ Process buffers can be created without running a major-mode hook."
   (add-hook 'lsp-bridge-source-mode-hook #'my/tab-line-source-refresh))
 
 (with-eval-after-load 'tab-line
+  ;; The native template prefixes every tab with this separator, including
+  ;; the first one.  Our formatter already provides face-matched clickable
+  ;; padding, so a plain separator would leave a gap before the highlight.
+  (setq tab-line-separator "")
   (setq tab-line-tab-name-function #'tab-line-tab-name-buffer)
   (setq tab-line-tab-name-format-function #'my/tab-line-format-with-padding)
   (add-hook 'tab-line-mode-hook #'my/tab-line-manage-hover-timer)
   (add-hook 'global-tab-line-mode-hook #'my/tab-line-manage-hover-timer)
+  (add-hook 'window-state-change-functions #'my/tab-line-manage-hover-timer)
+  (add-function :after after-focus-change-function #'my/tab-line-manage-hover-timer)
+  ;; Replace an existing timer when reloading this file (including its interval).
+  (my/tab-line-stop-hover-timer)
   (my/tab-line-manage-hover-timer)
   (tab-line-force-update t))
 

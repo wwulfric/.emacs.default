@@ -12,7 +12,7 @@
 ;;(message cns-prog)
 
 (setq cns-recent-segmentation-limit 20) ; default is 10
-(setq cns-debug t) ; disable debug output, default is t
+(setq cns-debug nil) ; Keep segmentation output out of the process buffer.
 (require 'cns nil t)
 (when (featurep 'cns)
   (add-hook 'find-file-hook 'cns-auto-enable))
@@ -39,6 +39,5 @@
 (global-set-key (kbd "M-b") 'smart-backward-word)
 
 (provide 'init-jieba-word)
-
 
 

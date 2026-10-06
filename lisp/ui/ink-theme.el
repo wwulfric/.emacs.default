@@ -9,14 +9,18 @@
 
 (deftheme ink "A quiet light theme with blue accents and readable contrast.")
 
+;; Roles: neutral ink/weight expresses structure; blue identifies interaction
+;; and selection; warm syntax ink distinguishes literal values.  Red/amber/green
+;; are reserved for diagnostic and change states.  Comments remain darker than
+;; secondary chrome; inactive selection and hover use distinct neutral surfaces.
 (let ((bg "#FFFFFF")
       (fg "#333333")
       (surface "#F3F4F5")
-      (active-surface "#ECEEF0")
       (selection "#E3ECFA")
       (inactive-selection "#ECEDEF")
-      (hover "#E7E9ED")
+      (hover "#E4E7EB")
       (accent "#245FA5")
+      (structure "#454B53")
       (muted "#747B84")
       (comment "#66717E")
       (border "#C7CBD1")
@@ -24,9 +28,7 @@
       (string "#9A4D2E")
       (green "#376B45")
       (red "#B42332")
-      (amber "#895B13")
-      (source "#EDF2EA")
-      (source-selected "#DCE8D6"))
+      (amber "#895B13"))
   (custom-theme-set-faces
    'ink
    ;; Base faces: leave font family and size to frame-setting.el.
@@ -63,10 +65,10 @@
    '(font-lock-comment-delimiter-face ((t (:inherit font-lock-comment-face))))
    `(font-lock-doc-face ((t (:foreground ,comment))))
    `(font-lock-string-face ((t (:foreground ,string))))
-   `(font-lock-keyword-face ((t (:foreground ,accent :weight bold))))
-   `(font-lock-builtin-face ((t (:foreground ,accent))))
-   `(font-lock-type-face ((t (:foreground ,accent))))
-   `(font-lock-constant-face ((t (:foreground ,accent))))
+   `(font-lock-keyword-face ((t (:foreground ,fg :weight bold))))
+   `(font-lock-builtin-face ((t (:foreground ,structure))))
+   `(font-lock-type-face ((t (:foreground ,structure))))
+   `(font-lock-constant-face ((t (:foreground ,structure))))
    `(font-lock-function-name-face ((t (:foreground ,fg :weight bold))))
    '(font-lock-function-call-face ((t (:inherit font-lock-function-name-face :weight normal))))
    `(font-lock-variable-name-face ((t (:foreground ,fg))))
@@ -77,22 +79,31 @@
    `(window-divider ((t (:foreground ,border))))
    '(window-divider-first-pixel ((t (:inherit window-divider))))
    '(window-divider-last-pixel ((t (:inherit window-divider))))
-   `(mode-line ((t (:inherit fixed-pitch :background ,active-surface :foreground "#454B53"
-                   :box nil :overline nil :underline nil :inverse-video nil :weight normal))))
+   `(mode-line ((t (:inherit fixed-pitch :background ,bg :foreground ,structure
+                   :box nil :overline ,border :underline nil :inverse-video nil :weight normal))))
    '(mode-line-active ((t (:inherit mode-line))))
-   `(mode-line-inactive ((t (:inherit mode-line :background ,surface :foreground ,muted))))
+   `(mode-line-inactive ((t (:inherit mode-line :background ,bg :foreground ,muted :overline ,section-rule))))
    '(mode-line-buffer-id ((t (:weight bold))))
    `(header-line ((t (:inherit fixed-pitch :background ,surface :foreground ,fg :box nil :overline nil :underline nil))))
-   `(tab-line ((t (:inherit fixed-pitch :height 1.0 :box nil :background ,surface))))
-   '(tab-line-tab ((t (:inherit tab-line :box nil :weight normal))))
-   `(tab-line-tab-inactive ((t (:inherit tab-line-tab :foreground "#555B63" :background ,surface))))
-   `(tab-line-tab-current ((t (:inherit tab-line-tab :weight bold :foreground ,accent :background ,selection))))
-   `(tab-line-highlight ((t (:box nil :background ,hover :foreground ,fg))))
-   `(my/tab-line-source ((t (:background ,source))))
-   `(my/tab-line-source-current ((t (:background ,source-selected))))
+   ;; Page-header tabs: one continuous rule, with color marking selection.
+   `(tab-line ((t (:inherit fixed-pitch :height 1.0 :box nil :weight normal
+                   :overline nil :underline (:color ,section-rule :position t)
+                   :foreground ,muted :background ,bg))))
+   `(tab-line-tab ((t (:inherit tab-line :foreground ,structure :background ,bg
+                        :underline (:color ,border :position t) :weight normal))))
+   `(tab-line-tab-inactive ((t (:inherit tab-line :foreground ,muted
+                                 :background ,bg :weight normal))))
+   `(tab-line-tab-current ((t (:inherit tab-line-tab :weight normal
+                                :foreground ,accent :background ,bg
+                                :underline (:color ,accent :position t)))))
+   `(tab-line-highlight ((t (:box nil :background ,bg :foreground ,accent :weight normal))))
+   ;; Dependency source tabs retain a green cue without a filled rectangle.
+   `(my/tab-line-source ((t (:foreground ,green :background ,bg))))
+   `(my/tab-line-source-current ((t (:foreground ,green :background ,bg
+                                      :underline (:color ,green :position t)))))
    `(dirvish-hl-line ((t (:inherit nil :background ,selection :extend t))))
    `(dirvish-hl-line-inactive ((t (:inherit nil :background ,inactive-selection :extend t))))
-   `(dired-directory ((t (:foreground ,accent :weight bold))))
+   `(dired-directory ((t (:foreground ,fg :weight bold))))
    `(dired-symlink ((t (:foreground ,green))))
    '(dired-flagged ((t (:inherit error))))
    ;; Completion and Chinese input popups share the editor palette.
@@ -107,7 +118,7 @@
    `(rime-candidate-num-face ((t (:foreground ,muted))))
    `(ido-first-match ((t (:foreground ,accent :weight bold))))
    `(ido-only-match ((t (:foreground ,green :weight bold))))
-   `(ido-subdir ((t (:foreground ,accent))))
+   `(ido-subdir ((t (:foreground ,fg :weight bold))))
    ;; Reading and writing: preserve actual emphasis and fixed-pitch tables.
    `(outline-1 ((t (:foreground ,fg :weight bold))))
    '(outline-2 ((t (:inherit outline-1))))

@@ -41,7 +41,7 @@
 
 ;; Number code buffers only; reading and utility buffers stay uncluttered.
 ;; Remove the previous global policy when this file is reloaded.
-(remove-hook 'display-line-numbers-mode-hook #'my/line-numbers-exclude-dired)
+(remove-hook 'display-line-numbers-mode-hook 'my/line-numbers-exclude-dired)
 (global-display-line-numbers-mode -1)
 
 (defun my/prog-line-numbers ()
@@ -109,6 +109,213 @@
 (setq mode-line-front-space
       '(:eval (if (display-graphic-p) (my/ui-mode-line-space 1) "-")))
 
+(require 'subr-x)
+
+;; Compact status: native mode menus, contextual flags and cursor position.
+(defvar lsp-bridge-diagnostic-records)
+(defvar lsp-bridge-diagnostic-count)
+(defvar-local my/ui-diagnostic-summary nil)
+
+(defun my/ui-update-diagnostics ()
+  "Cache diagnostic counts when the language server publishes an update."
+  (setq my/ui-diagnostic-summary
+        (when (and (boundp 'lsp-bridge-diagnostic-count)
+                   (numberp lsp-bridge-diagnostic-count)
+                   (> lsp-bridge-diagnostic-count 0))
+          (if (/= lsp-bridge-diagnostic-count
+                  (length (bound-and-true-p lsp-bridge-diagnostic-records)))
+              ;; Records can be capped or filtered: don't mislabel the total.
+              (format "诊断 %d" lsp-bridge-diagnostic-count)
+            (let ((errors 0) (warnings 0))
+              (dolist (record lsp-bridge-diagnostic-records)
+                (pcase (plist-get record :severity)
+                  (1 (setq errors (1+ errors)))
+                  (2 (setq warnings (1+ warnings)))))
+              (string-join
+               (delq nil (list
+                          (when (> errors 0)
+                            (propertize (format "E%d" errors) 'face 'error))
+                          (when (> warnings 0)
+                            (propertize (format "W%d" warnings) 'face 'warning))))
+               " ")))))
+  (force-mode-line-update))
+
+(with-eval-after-load 'lsp-bridge-diagnostic
+  (add-hook 'lsp-bridge-diagnostic-update-hook #'my/ui-update-diagnostics)
+  (dolist (buffer (buffer-list))
+    (with-current-buffer buffer
+      (when (bound-and-true-p lsp-bridge-mode) (my/ui-update-diagnostics)))))
+
+(defun my/ui-enabled-minor-modes ()
+  "Return enabled registered minor modes, including modes with no lighter."
+  (sort (delete-dups
+         (seq-filter
+          (lambda (mode) (and (symbolp mode) (boundp mode) (symbol-value mode)))
+          (append minor-mode-list (mapcar #'car minor-mode-alist)
+                  (mapcar #'car minor-mode-map-alist))))
+        (lambda (a b) (string-lessp (symbol-name a) (symbol-name b)))))
+
+(defun my/ui-mode-menu-action (buffer function &optional disable)
+  "Make a menu command running FUNCTION in BUFFER.
+When DISABLE is non-nil, explicitly turn the mode off rather than toggle it."
+  (lambda ()
+    (interactive)
+    (unless (buffer-live-p buffer) (user-error "原缓冲区已关闭"))
+    (with-current-buffer buffer
+      (if disable
+          (let ((current-prefix-arg -1)) (call-interactively function))
+        (funcall function)))))
+
+(defun my/ui-minor-mode-menu (mode menus)
+  "Build a submenu for enabled MODE using its native MENUS when available."
+  (let* ((buffer (current-buffer))
+         (command (or (get mode :minor-mode-function) mode))
+         (map (or (cdr (assq mode minor-mode-overriding-map-alist))
+                  (cdr (assq mode minor-mode-map-alist))))
+         (native (cdr (assq mode menus)))
+         (menu (make-sparse-keymap (symbol-name mode))))
+    ;; Insert in reverse order: define-key prepends items to a sparse keymap.
+    (when (commandp command)
+      (define-key menu [disable]
+        `(menu-item ,(if (local-variable-p mode) "关闭此模式" "关闭此模式（全局）")
+                    ,(my/ui-mode-menu-action buffer command t))))
+    (when (keymapp map)
+      (define-key menu [bindings]
+        `(menu-item "快捷键"
+                    ,(my/ui-mode-menu-action
+                      buffer (lambda () (describe-keymap map))))))
+    (define-key menu [help]
+      `(menu-item "帮助"
+                  ,(my/ui-mode-menu-action
+                    buffer (lambda ()
+                             (if (fboundp command) (describe-function command)
+                               (describe-variable mode))))))
+    (when (keymapp native)
+      (define-key menu [native] `(menu-item "模式操作" ,native)))
+    menu))
+
+(defun my/ui-visible-mode-lighters ()
+  "Return enabled, visible minor modes and their rendered native labels.
+Preserve `minor-mode-alist' order and respect Emacs' collapse preference."
+  (let ((collapse (bound-and-true-p mode-line-collapse-minor-modes)) result)
+    (dolist (entry minor-mode-alist)
+      (let ((mode (car entry)))
+        (when (and (symbolp mode) (boundp mode) (symbol-value mode)
+                   (not (assq mode result))
+                   (cond ((not collapse) t)
+                         ((eq (car-safe collapse) 'not) (memq mode (cdr collapse)))
+                         ((listp collapse) (not (memq mode collapse)))
+                         (t nil)))
+          (let ((label (string-trim
+                        (substring-no-properties
+                         (format-mode-line `("" ,@(cdr entry)))))))
+            (unless (string-empty-p label)
+              (push (cons mode label) result))))))
+    (nreverse result)))
+
+(defun my/ui-build-mode-menu ()
+  "Build native visible modes first, with other enabled modes in a submenu."
+  (let* ((menu (make-sparse-keymap "模式"))
+         (more-menu (make-sparse-keymap "更多已启用模式"))
+         (buffer (current-buffer)))
+    (run-hooks 'activate-menubar-hook 'menu-bar-update-hook)
+    (let* ((visible (my/ui-visible-mode-lighters))
+           (others (seq-remove (lambda (mode) (assq mode visible))
+                               (my/ui-enabled-minor-modes)))
+           (native-menus (minor-mode-key-binding [menu-bar])))
+      (define-key menu [help]
+        `(menu-item "全部模式帮助" ,(my/ui-mode-menu-action buffer #'describe-mode)))
+      (when others
+        (dolist (mode (reverse others))
+          (define-key more-menu (vector mode)
+            `(menu-item ,(concat (symbol-name mode)
+                                 (unless (local-variable-p mode) " [全局]"))
+                        ,(my/ui-minor-mode-menu mode native-menus))))
+        (define-key menu [more]
+          `(menu-item ,(format "更多已启用模式 (%d)" (length others)) ,more-menu)))
+      (dolist (entry (reverse visible))
+        (define-key menu (vector (car entry))
+          `(menu-item ,(concat (cdr entry)
+                               (unless (local-variable-p (car entry)) " [全局]"))
+                      ,(my/ui-minor-mode-menu (car entry) native-menus)))))
+    (let* ((major (make-sparse-keymap (symbol-name major-mode)))
+           (native (and (current-local-map)
+                        (lookup-key (current-local-map) [menu-bar])))
+           (map (current-local-map)))
+      (define-key major [help]
+        `(menu-item "帮助" ,(my/ui-mode-menu-action buffer #'describe-mode)))
+      (when (keymapp map)
+        (define-key major [bindings]
+          `(menu-item "快捷键" ,(my/ui-mode-menu-action
+                                 buffer (lambda () (describe-keymap map))))))
+      (when (keymapp native)
+        (define-key major [native] `(menu-item "模式操作" ,native)))
+      (define-key menu [major]
+        `(menu-item ,(or (and (stringp mode-name) mode-name) (symbol-name major-mode))
+                    ,major)))
+    menu))
+
+(defun my/ui-show-mode-menu (&optional event)
+  "Show all mode menus for the window clicked in EVENT, or the current buffer."
+  (interactive (list (when (mouse-event-p last-input-event) last-input-event)))
+  (when event
+    (let ((window (posn-window (event-start event))))
+      (when (window-live-p window) (select-window window))))
+  (popup-menu (my/ui-build-mode-menu) (or event (posn-at-point))))
+
+(defvar my/ui-mode-menu-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mode-line down-mouse-1] #'my/ui-show-mode-menu)
+    (define-key map [mode-line down-mouse-3] #'my/ui-show-mode-menu)
+    (define-key map [mode-line mouse-2] #'describe-mode)
+    map)
+  "Unified mode menu on the status button.")
+
+(defun my/ui-status-line ()
+  "Return status for the window being rendered, retaining native mode menus.
+Window-local point is supplied by Emacs during mode-line redisplay.  Respect
+package-owned local mode lines by changing only the default format."
+  (let* ((active (mode-line-window-selected-p))
+         (width (window-body-width))
+         (tabbed (and (bound-and-true-p tab-line-mode) tab-line-format))
+         (flags (delq nil
+                      (list (when (and (not tabbed) (buffer-modified-p)) "●")
+                            (when buffer-read-only "只读")
+                            (when (buffer-narrowed-p) "窄域")
+                            (when defining-kbd-macro "录制")
+                            (when (and active current-input-method)
+                              current-input-method-title))))
+         (writing (and active (>= width 65)
+                       (delq nil
+                             (list (when (bound-and-true-p my/writing-layout-mode) "阅读")
+                                   (when (bound-and-true-p my/writing-numbering-mode) "编号")))))
+         (position (and active
+                        (format "%s  %d%%"
+                                (format-mode-line "%l:%c")
+                                (/ (* 100 (- (point) (point-min)))
+                                   (max 1 (- (point-max) (point-min)))))))
+         (diagnostics (and active (>= width 45)
+                           (bound-and-true-p lsp-bridge-mode)
+                           my/ui-diagnostic-summary))
+         (right (string-join (delq nil (list diagnostics position)) "  "))
+         (identity (when (not tabbed)
+                     (truncate-string-to-width (buffer-name) (max 5 (/ width 3)) nil nil "…")))
+         (name (when (>= width 55) (format-mode-line mode-name)))
+         (left (string-join (append (delq nil (list identity name)) flags writing) " · "))
+         (room (max 0 (- width 5 (string-width right))))
+         (left (truncate-string-to-width left room nil nil "…")))
+    (list
+     (propertize "☰" 'local-map my/ui-mode-menu-map
+                 'mouse-face 'mode-line-highlight
+                 'help-echo "左键/右键：模式操作、已启用的次要模式与快捷键；中键：全部模式帮助")
+     " " (string-replace "%" "%%" left)
+     (when (not (string-empty-p right))
+       (propertize " " 'display `(space :align-to (- right ,(1+ (string-width right))))))
+     (string-replace "%" "%%" right) " ")))
+
+(setq-default mode-line-format
+              '(mode-line-front-space (:eval (my/ui-status-line))))
+
 ;; Line spacing, can be 0 for code and 1 or 2 for text
 ;; (setq-default line-spacing nil)
 ;; (setq-default default-text-properties '(line-spacing 0.25 line-height 1.25))
@@ -163,7 +370,8 @@ reading margins remain independent."
 
 (defface fallback '((t :family "Fira Code"
                        :inherit shadow))
-  "Fallback")
+  "Fallback glyphs for truncation and continuation indicators."
+  :group 'faces)
 
 (set-display-table-slot standard-display-table 'truncation
                         (make-glyph-code ?… 'fallback))

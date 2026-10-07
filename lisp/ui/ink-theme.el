@@ -9,10 +9,10 @@
 
 (deftheme ink "A quiet light theme with blue accents and readable contrast.")
 
-;; Roles: neutral ink/weight expresses structure; blue identifies interaction
-;; and selection; warm syntax ink distinguishes literal values.  Red/amber/green
-;; are reserved for diagnostic and change states.  Comments remain darker than
-;; secondary chrome; inactive selection and hover use distinct neutral surfaces.
+;; Roles: quiet neutral chrome with blue interaction and selection cues.
+;; Syntax uses blue keywords, purple types/builtins and warm literal values.
+;; Comments remain darker than secondary chrome; diagnostics retain distinct
+;; red/amber/green cues.
 (let ((bg "#FFFFFF")
       (fg "#333333")
       (surface "#F3F4F5")
@@ -21,6 +21,8 @@
       (hover "#E4E7EB")
       (accent "#245FA5")
       (structure "#454B53")
+      (syntax-blue "#315F91")
+      (syntax-purple "#70528A")
       (muted "#747B84")
       (comment "#66717E")
       (border "#C7CBD1")
@@ -65,9 +67,9 @@
    '(font-lock-comment-delimiter-face ((t (:inherit font-lock-comment-face))))
    `(font-lock-doc-face ((t (:foreground ,comment))))
    `(font-lock-string-face ((t (:foreground ,string))))
-   `(font-lock-keyword-face ((t (:foreground ,fg :weight bold))))
-   `(font-lock-builtin-face ((t (:foreground ,structure))))
-   `(font-lock-type-face ((t (:foreground ,structure))))
+   `(font-lock-keyword-face ((t (:foreground ,syntax-blue :weight bold))))
+   `(font-lock-builtin-face ((t (:foreground ,syntax-purple))))
+   `(font-lock-type-face ((t (:foreground ,syntax-purple))))
    `(font-lock-constant-face ((t (:foreground ,structure))))
    `(font-lock-function-name-face ((t (:foreground ,fg :weight bold))))
    '(font-lock-function-call-face ((t (:inherit font-lock-function-name-face :weight normal))))

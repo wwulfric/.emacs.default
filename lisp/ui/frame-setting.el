@@ -1,8 +1,11 @@
 ;;; frame-setting.el --- Frame and window appearance -*- lexical-binding: t; -*-
 
-(defconst my/ui-space-small 6 "Small UI spacing unit, in pixels.")
+(defconst my/ui-space-small 4 "Small UI spacing unit, in pixels.")
 (defconst my/ui-editor-padding (* 4 my/ui-space-small)
-  "Shared 24-pixel text padding for code and prose windows.")
+  "Shared text padding for code and prose windows, in pixels.")
+
+(defconst my/ui-status-padding my/ui-editor-padding
+  "Horizontal padding at both edges of editor status bars, in pixels.")
 
 (dolist (parameter `((width . 100) (height . 50)
                      (vertical-scroll-bars . nil)
@@ -302,19 +305,32 @@ package-owned local mode lines by changing only the default format."
                      (truncate-string-to-width (buffer-name) (max 5 (/ width 3)) nil nil "…")))
          (name (when (>= width 55) (format-mode-line mode-name)))
          (left (string-join (append (delq nil (list identity name)) flags writing) " · "))
-         (room (max 0 (- width 5 (string-width right))))
+         (room (max 0 (- width 3
+                         (* 2 (ceiling my/ui-status-padding (frame-char-width)))
+                         (string-width right))))
          (left (truncate-string-to-width left room nil nil "…")))
     (list
+     ;; Emit the spacer directly: mode-line-front-space can be suppressed
+     ;; when its nested :eval is reached through an untrusted variable.
+     (my/ui-mode-line-space (if (display-graphic-p) (list my/ui-status-padding) 1))
      (propertize "☰" 'local-map my/ui-mode-menu-map
                  'mouse-face 'mode-line-highlight
                  'help-echo "左键/右键：模式操作、已启用的次要模式与快捷键；中键：全部模式帮助")
      " " (string-replace "%" "%%" left)
      (when (not (string-empty-p right))
-       (propertize " " 'display `(space :align-to (- right ,(1+ (string-width right))))))
-     (string-replace "%" "%%" right) " ")))
+       (propertize " " 'display
+                   (if (display-graphic-p)
+                       `(space :align-to (- (+ right right-fringe right-margin)
+                                            (,my/ui-status-padding)
+                                            (,(string-pixel-width right))))
+                     `(space :align-to (- right ,(1+ (string-width right)))))))
+     (string-replace "%" "%%" right)
+     (propertize " " 'display
+                 `(space :width ,(if (display-graphic-p)
+                                     (list my/ui-status-padding) 1))))))
 
 (setq-default mode-line-format
-              '(mode-line-front-space (:eval (my/ui-status-line))))
+              '((:eval (my/ui-status-line))))
 
 ;; Line spacing, can be 0 for code and 1 or 2 for text
 ;; (setq-default line-spacing nil)

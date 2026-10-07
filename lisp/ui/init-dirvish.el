@@ -209,23 +209,29 @@ Outside the sidebar, preserve Dired's usual mouse behavior."
   (interactive)
   (my/dirvish-open-directory (project-root (project-current t))))
 
-(defun my/dirvish-after-project-switch (directory)
-  "Ensure DIRECTORY is visible after an explicit project switch."
-  (my/dirvish-show directory))
-
 (defun my/dirvish-after-project-find-file (&rest _)
   "Show the current project after opening a project file."
   (my/dirvish-show))
 
 (advice-add 'project-dired :override #'my/dirvish-project-dired)
-(advice-add 'project-switch-project :after #'my/dirvish-after-project-switch)
+;; Project switching and startup are owned by init-workspace.el.
+;; Dirvish's async metadata buffers look like ordinary project buffers;
+;; killing one mid-fetch makes its sentinel fail when a project is closed.
+(setq project-kill-buffer-conditions
+      (mapcar (lambda (condition)
+                (if (equal condition '(and (major-mode . fundamental-mode) "\\`[^ ]"))
+                    (append condition '((not "\\`\\*dirvish-batch\\*")))
+                  condition))
+              project-kill-buffer-conditions))
+(advice-remove 'project-switch-project #'my/dirvish-after-project-switch)
+(remove-hook 'emacs-startup-hook #'my/dirvish-startup)
 (advice-add 'project-find-file :after #'my/dirvish-after-project-find-file)
 
-(defun my/dirvish-startup ()
-  "Turn command-line directory windows into a sidebar and empty editor.
+(defun my/dirvish-take-startup-directory ()
+  "Replace command-line directory windows with empty editors; return the first.
 Run after Emacs has processed file arguments, including relative paths and
 paths following --.  Explicit file buffers remain in their editor windows.
-When several directories are visible, use the first one's root."
+The caller decides what to show for the returned directory."
   (let (directory)
     (dolist (window (window-list))
       (with-current-buffer (window-buffer window)
@@ -242,11 +248,7 @@ When several directories are visible, use the first one's root."
                                 (window-prev-buffers window)))
             (set-window-next-buffers
              window (delq directory-buffer (window-next-buffers window)))))))
-    (when directory
-      (set-buffer (window-buffer (selected-window)))
-      (my/dirvish-show directory))))
-
-(add-hook 'emacs-startup-hook #'my/dirvish-startup)
+    directory))
 
 (provide 'init-dirvish)
 ;;; init-dirvish.el ends here

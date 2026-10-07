@@ -108,6 +108,18 @@
    `(dired-directory ((t (:foreground ,fg :weight bold))))
    `(dired-symlink ((t (:foreground ,green))))
    '(dired-flagged ((t (:inherit error))))
+   ;; Start page: quiet chrome, the selected row uses the selection color.
+   `(my/welcome-title ((t (:foreground ,structure :weight bold :height 1.6))))
+   `(my/welcome-subtitle ((t (:foreground ,muted))))
+   `(my/welcome-heading ((t (:foreground ,muted :weight bold))))
+   `(my/welcome-rule ((t (:foreground ,section-rule))))
+   `(my/welcome-name ((t (:foreground ,fg :weight bold))))
+   `(my/welcome-path ((t (:foreground ,muted))))
+   `(my/welcome-meta ((t (:foreground ,comment))))
+   `(my/welcome-pin ((t (:foreground ,amber))))
+   `(my/welcome-unavailable ((t (:foreground ,border :slant italic))))
+   `(my/welcome-key ((t (:inherit fixed-pitch :foreground ,accent))))
+   `(my/welcome-row ((t (:background ,selection))))
    ;; Completion and Chinese input popups share the editor palette.
    `(acm-frame-default-face ((t (:foreground ,fg :background ,surface))))
    `(acm-frame-border-face ((t (:background ,border))))

@@ -20,6 +20,21 @@
 ;; Personal display configuration lives together; vendor paths stay unchanged.
 (add-to-list 'load-path (expand-file-name "ui" emacs-root-dir))
 
+;; The initial frame exists before this file loads.  Show the start page's
+;; empty buffer during startup so *scratch* never flashes; file arguments
+;; replace it as usual (see `my/workspace-startup').
+(unless (or noninteractive (daemonp))
+  (with-current-buffer (get-buffer-create "*Welcome*")
+    (setq-local mode-line-format nil
+                tab-line-exclude t
+                cursor-type nil))
+  (switch-to-buffer "*Welcome*")
+  ;; Nor should the initial *scratch* linger as a tab.
+  (set-window-prev-buffers nil nil))
+
+;; State files under var/; must precede smex, ido and project.el.
+(require 'init-session)
+
 
 ;; smex
 (require 'smex)
@@ -63,6 +78,9 @@
 (require 'init-jieba-word)
 (require 'init-lsp)
 (require 'init-navigation)
+;; Per-project workspaces and the start page shown without file arguments.
+(require 'init-workspace)
+(require 'init-welcome)
 
 (require 'exec-path-from-shell)
 (dolist (var '("SSH_AUTH_SOCK" "SSH_AGENT_PID" "GPG_AGENT_INFO" "LANG" "LC_CTYPE" "NIX_SSL_CERT_FILE" "NIX_PATH"))

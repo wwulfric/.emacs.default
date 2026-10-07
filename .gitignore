@@ -20,7 +20,7 @@ projectile-bookmarks.eld
 session*
 .cask
 tramp
-/var/pcache
+/var/
 .emacs.desktop
 .emacs.desktop.lock
 network-security.data

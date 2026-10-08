@@ -10,9 +10,8 @@
 (deftheme ink "A quiet light theme with blue accents and readable contrast.")
 
 ;; Roles: quiet neutral chrome with blue interaction and selection cues.
-;; Syntax uses blue keywords, purple types/builtins and warm literal values.
-;; Comments remain darker than secondary chrome; diagnostics retain distinct
-;; red/amber/green cues.
+;; Syntax uses regular-weight blue keywords, teal definitions and green strings.
+;; Light neutral comments recede behind code; diagnostics retain distinct cues.
 (let ((bg "#FFFFFF")
       (fg "#333333")
       (surface "#F3F4F5")
@@ -23,6 +22,9 @@
       (structure "#454B53")
       (syntax-blue "#315F91")
       (syntax-purple "#70528A")
+      (syntax-function "#00677D")
+      (syntax-string "#008000")
+      (syntax-comment "#858585")
       (muted "#747B84")
       (comment "#66717E")
       (border "#C7CBD1")
@@ -62,17 +64,17 @@
    `(tooltip ((t (:foreground ,fg :background ,surface))))
    `(internal-border ((t (:background ,bg))))
    `(child-frame-border ((t (:background ,border))))
-   ;; Syntax: restrained colors, with comments more legible than UI metadata.
-   `(font-lock-comment-face ((t (:foreground ,comment :slant normal))))
+   ;; Syntax: use color rather than bold weight to distinguish code roles.
+   `(font-lock-comment-face ((t (:foreground ,syntax-comment :slant normal))))
    '(font-lock-comment-delimiter-face ((t (:inherit font-lock-comment-face))))
-   `(font-lock-doc-face ((t (:foreground ,comment))))
-   `(font-lock-string-face ((t (:foreground ,string))))
-   `(font-lock-keyword-face ((t (:foreground ,syntax-blue :weight bold))))
+   `(font-lock-doc-face ((t (:foreground ,syntax-comment))))
+   `(font-lock-string-face ((t (:foreground ,syntax-string))))
+   `(font-lock-keyword-face ((t (:foreground ,syntax-blue :weight normal))))
    `(font-lock-builtin-face ((t (:foreground ,syntax-purple))))
    `(font-lock-type-face ((t (:foreground ,syntax-purple))))
    `(font-lock-constant-face ((t (:foreground ,structure))))
-   `(font-lock-function-name-face ((t (:foreground ,fg :weight bold))))
-   '(font-lock-function-call-face ((t (:inherit font-lock-function-name-face :weight normal))))
+   `(font-lock-function-name-face ((t (:foreground ,syntax-function :weight normal))))
+   `(font-lock-function-call-face ((t (:foreground ,fg :weight normal))))
    `(font-lock-variable-name-face ((t (:foreground ,fg))))
    '(font-lock-variable-use-face ((t (:inherit font-lock-variable-name-face))))
    '(font-lock-warning-face ((t (:inherit warning))))
@@ -105,6 +107,12 @@
                                       :underline (:color ,green :position t)))))
    `(dirvish-hl-line ((t (:inherit nil :background ,selection :extend t))))
    `(dirvish-hl-line-inactive ((t (:inherit nil :background ,inactive-selection :extend t))))
+   `(my/dirvish-file-name ((t (:family "Helvetica Neue" :height 0.95 :weight normal))))
+   `(my/dirvish-project-title ((t (:family "Helvetica Neue" :foreground ,fg :weight medium))))
+   `(my/dirvish-neutral-icon ((t (:foreground ,muted))))
+   `(my/dirvish-source-icon ((t (:foreground ,accent))))
+   `(dirvish-subtree-guide ((t (:inherit fixed-pitch :foreground ,section-rule))))
+   `(dirvish-subtree-state ((t (:inherit fixed-pitch :foreground ,muted))))
    `(dired-directory ((t (:foreground ,fg :weight bold))))
    `(dired-symlink ((t (:foreground ,green))))
    '(dired-flagged ((t (:inherit error))))

@@ -34,6 +34,67 @@
 ;; Share tab-line's font metrics and vertical padding, only in the sidebar.
 (require 'face-remap)
 (defvar-local my/dirvish-header-face-cookie nil)
+(defvar-local my/dirvish-font-face-cookie nil)
+(defvar my/dirvish-icon-cache (make-hash-table :test #'equal))
+
+(defun my/dirvish-align-subtree-state (result)
+  "Keep RESULT's disclosure column fixed-width in proportional sidebars."
+  (when (and my/dirvish-font-face-cookie (eq (car-safe result) 'ov))
+    (when-let* ((text (overlay-get (cdr result) 'after-string)))
+      (add-face-text-property 0 (length text) 'dirvish-subtree-state t text)))
+  result)
+
+(with-eval-after-load 'dirvish-subtree
+  (advice-add 'dirvish-attribute-subtree-state-rd :filter-return
+              #'my/dirvish-align-subtree-state))
+
+(defface my/dirvish-file-name
+  '((t (:family "Helvetica Neue" :height 0.95 :weight normal)))
+  "Proportional sidebar text." :group 'dirvish)
+(defface my/dirvish-project-title '((t (:inherit default)))
+  "Sidebar project title." :group 'dirvish)
+(defface my/dirvish-neutral-icon '((t (:inherit shadow)))
+  "Folder and ordinary file icons." :group 'dirvish)
+(defface my/dirvish-source-icon '((t (:inherit link)))
+  "Source file icons." :group 'dirvish)
+
+(defun my/dirvish-file-icon (name directory)
+  "Return a small SVG icon for NAME, or a folder when DIRECTORY is non-nil."
+  (let* ((source (member (file-name-extension name)
+                         '("el" "go" "hs" "py" "js" "jsx" "ts" "tsx"
+                           "rs" "c" "h" "cpp" "java" "swift")))
+         (color (face-foreground (if (and source (not directory))
+                                    'my/dirvish-source-icon
+                                  'my/dirvish-neutral-icon) nil t))
+         (kind (cond (directory 'folder) (source 'code) (t 'file)))
+         (key (list kind color)))
+    (or (gethash key my/dirvish-icon-cache)
+        (puthash
+         key
+         (create-image
+          (format
+           "<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'><g fill='none' stroke='%s' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'>%s</g></svg>"
+           color
+           (pcase kind
+             ('folder "<path d='M1.5 4V13h13V5H7L5.5 3h-4Z'/>")
+             ('code "<path d='m5 4-4 4 4 4m6-8 4 4-4 4M9 3 7 13'/>")
+             (_ "<path d='M3 1.5h6l4 4v9H3ZM9 1.5V6h4M5.5 9h5m-5 3h5'/>")))
+          'svg t :ascent 'center)
+         my/dirvish-icon-cache))))
+
+(dirvish-define-attribute my-sidebar-icon
+  "Small outline icons without an external icon-font dependency."
+  :when (and (display-graphic-p) (image-type-available-p 'svg))
+  :width 3
+  (let ((ov (make-overlay (1- f-beg) f-beg)))
+    (overlay-put ov 'after-string
+                 (concat (propertize " " 'display
+                                     (my/dirvish-file-icon
+                                      f-str (eq (car f-type) 'dir))
+                                     'face hl-face)
+                         (propertize " " 'display '(space :width (6))
+                                     'face hl-face)))
+    `(ov . ,ov)))
 
 (defun my/dirvish-pad-project-title (title)
   "Give the sidebar's TITLE the same vertical padding as buffer tabs."
@@ -41,7 +102,11 @@
             ((eq (dv-type session) 'side)))
       (concat (propertize " " 'face 'header-line
                           'display (my/ui-header-space 0))
-              title)
+              (propertize
+               (concat " " (file-name-nondirectory
+                             (directory-file-name
+                              (or (dirvish--vc-root-dir) default-directory))))
+               'face 'my/dirvish-project-title))
     title))
 
 (with-eval-after-load 'dirvish-widgets
@@ -49,7 +114,7 @@
 
 ;; Selection colors are supplied by ink-theme.el.
 (setq dirvish-side-width 30
-      dirvish-side-attributes '(subtree-state)
+      dirvish-side-attributes '(subtree-state my-sidebar-icon)
       dirvish-side-auto-expand t)
 
 (dirvish-override-dired-mode 1)
@@ -103,6 +168,11 @@ Outside the sidebar, preserve Dired's usual mouse behavior."
               ((eq (dv-type session) 'side)))
     ;; Follow the buffer's normal text face, including after theme changes.
     (face-remap-set-base 'dired-directory 'default)
+    (unless my/dirvish-font-face-cookie
+      (setq my/dirvish-font-face-cookie
+            (face-remap-add-relative 'default 'my/dirvish-file-name)))
+    (setq-local line-spacing 0.2)
+    (setq-local dirvish-subtree-prefix "  │")
     ;; The sidebar already has its project header; its internal buffer is no tab.
     (setq-local tab-line-exclude t)
     (when (bound-and-true-p tab-line-mode) (tab-line-mode -1))
@@ -128,6 +198,9 @@ Outside the sidebar, preserve Dired's usual mouse behavior."
       (when-let* ((session (dirvish-curr))
                   ((eq (dv-type session) 'side)))
         ;; Sessions cache their composed status bar; refresh it on reload too.
+        (setf (dv-attributes session)
+              (dirvish--attrs-expand dirvish-side-attributes))
+        (dirvish-prop :attrs (dv-attributes session))
         (setf (dv-mode-line session)
               (dirvish--mode-line-composer
                (plist-get dirvish-side-mode-line-format :left)

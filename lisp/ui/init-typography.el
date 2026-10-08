@@ -11,6 +11,25 @@
 (require 'seq)
 (require 'fontset)
 
+(defun my/typography-code-spacing ()
+  "Give code space above and below each line on graphical displays."
+  ;; https://emacs-china.org/t/emacs/30399/18 uses 1.2 + 0.2.
+  ;; About 40% extra height for ordinary text,
+  ;; split above/below.  Emacs still accommodates taller glyphs naturally.
+  ;; Copy the plist so unrelated defaults and other buffers stay intact.
+  (setq-local default-text-properties
+              (let ((properties (copy-sequence default-text-properties)))
+                (setq properties (plist-put properties 'line-height 1.2))
+                (plist-put properties 'line-spacing 0.2)))
+  (setq-local line-spacing 0))
+
+(add-hook 'prog-mode-hook #'my/typography-code-spacing)
+;; Also apply when this configuration is reloaded with code buffers open.
+(dolist (buffer (buffer-list))
+  (with-current-buffer buffer
+    (when (derived-mode-p 'prog-mode)
+      (my/typography-code-spacing))))
+
 (defconst my/typography-font-height 140
   "Nominal fontset size in tenths of a point; faces follow the frame size.")
 

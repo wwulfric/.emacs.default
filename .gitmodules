@@ -55,3 +55,6 @@
 [submodule "lisp/compat"]
 	path = lisp/compat
 	url = https://github.com/emacs-compat/compat.git
+[submodule "lisp/expui-icons"]
+	path = lisp/expui-icons
+	url = git@github.com:wwulfric/expui-icons.git

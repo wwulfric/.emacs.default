@@ -3,6 +3,7 @@
 ;; Loaded after frame-setting, which defines the shared UI header spacing.
 (require 'seq)
 (require 'tab-line)
+(require 'expui-icons)
 
 (defun my/tab-line-buffer-visible-p (buffer)
   "Return non-nil when BUFFER belongs in an editor tab strip."
@@ -101,6 +102,14 @@ Process buffers can be created without running a major-mode hook."
   "Selected external source tab; colors are supplied by the active theme."
   :group 'tab-line)
 
+(defun my/tab-line-icon (tab label)
+  "Return TAB's icon followed by a gap, carrying LABEL's tab properties."
+  (when (and (bufferp tab) (expui-icons-svg-p))
+    (let ((props (text-properties-at 0 label)))
+      ;; In `mono' style the icon takes the tab's text color via its face.
+      (concat (apply #'propertize (expui-icons-icon-for-buffer tab) props)
+              (apply #'propertize " " 'display '(space :width (5)) props)))))
+
 (defun my/tab-line-format-with-padding (tab tabs)
   "Add clickable padding around the standard TAB label and close button."
   (let* ((selected (if (bufferp tab) (eq tab (window-buffer))
@@ -141,7 +150,7 @@ Process buffers can be created without running a major-mode hook."
     ;; Share the vertical strut with Dirvish; keep the label font unchanged.
     (put-text-property 0 1 'display
                        (my/ui-header-space 1.2) padding)
-    (concat padding label padding)))
+    (concat padding (my/tab-line-icon tab label) label padding)))
 
 (defun my/tab-line-source-refresh ()
   "Refresh source tab appearance and origin tooltips in all windows."

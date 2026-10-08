@@ -10,6 +10,10 @@
 (require 'dirvish)
 (require 'dirvish-side)
 
+;; macOS BSD ls does not support GNU ls's --dired option.
+(when (eq system-type 'darwin)
+  (setq dired-use-ls-dired nil))
+
 ;; Show dotfiles, but omit the synthetic . and .. entries (BSD/GNU ls).
 (setq dired-listing-switches "-lA")
 

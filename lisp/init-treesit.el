@@ -137,6 +137,9 @@
         (yaml-mode       . yaml-ts-mode)
         ))
 
+;; Use the built-in Go mode for automatic syntax highlighting.
+(add-to-list 'auto-mode-alist '("\\.go\\'" . go-ts-mode))
+
 ;; (add-hook 'markdown-mode-hook #'(lambda () (treesit-parser-create 'markdown)))
 (add-hook 'markdown-ts-mode-hook #'(lambda () (treesit-parser-create 'markdown)))
 

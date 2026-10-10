@@ -99,14 +99,21 @@
   "Return a spacer display specification with WIDTH and shared header height."
   `(space :width ,width :height ,my/ui-header-height :ascent 75))
 
-(defvar my/ui-mode-line-height 1.4
-  "Minimum status-bar height in fixed-pitch font units.")
+(defvar my/ui-mode-line-height 1.6
+  "Minimum status-bar height in frame character units.")
 
 (defun my/ui-mode-line-space (width)
   "Return a WIDTH-column spacer keeping status bars level across windows."
+  ;; A bare :height scales with the buffer's font, including Dirvish's
+  ;; default-face remapping.  A one-element list specifies absolute pixels
+  ;; so every window in this frame gets the same height and baseline.
+  ;; Leave enough descent for fallback glyphs such as the menu's ☰; otherwise
+  ;; they can grow the editor's bar beyond the sidebar's spacer height.
   (propertize " " 'face 'fixed-pitch
               'display `(space :width ,width
-                               :height ,my/ui-mode-line-height :ascent 80)))
+                               :height (,(ceiling (* (frame-char-height)
+                                                    my/ui-mode-line-height)))
+                               :ascent 75)))
 
 ;; Reserve the same height even when only one status bar contains CJK text.
 (setq mode-line-front-space

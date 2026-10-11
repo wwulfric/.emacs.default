@@ -26,7 +26,6 @@
 (declare-function my/welcome-show "init-welcome")
 (declare-function my/frame-title-directory "init-frame-title")
 (defvar my/frame-title-cache)
-(defvar dirvish-side-width)
 
 (defvar my/workspace-directory (my/var-file "workspaces/")
   "Directory holding one saved workspace per project.")
@@ -325,8 +324,8 @@ START and POINT default to the buffer's own point."
                                :left (frame-parameter frame 'left)
                                :top (frame-parameter frame 'top)
                                :fullscreen (frame-parameter frame 'fullscreen)))
-                :sidebar (list :visible (and sidebar t)
-                               :width (and sidebar (window-total-width sidebar)))
+                ;; The sidebar's width follows the frame; see init-dirvish.el.
+                :sidebar (list :visible (and sidebar t))
                 :layout (my/workspace--capture-window (window-main-window frame) root)
                 :history (my/workspace--capture-history frame root)))))))
 
@@ -560,8 +559,7 @@ restores the frame size and position."
       (switch-to-buffer (find-file-noselect file)))
     (when (and (fboundp 'my/dirvish-show)
                (or (null state) (plist-get sidebar :visible)))
-      (let ((dirvish-side-width (or (plist-get sidebar :width) dirvish-side-width)))
-        (my/dirvish-show root)))
+      (my/dirvish-show root))
     (when-let* ((project (project-current nil root)))
       (project-remember-project project))
     (my/workspace-meta-update root :name (my/workspace-root-name root)

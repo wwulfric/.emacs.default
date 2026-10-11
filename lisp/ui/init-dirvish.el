@@ -11,26 +11,44 @@
 (require 'dirvish-side)
 (require 'expui-icons)
 
-;; macOS BSD ls does not support GNU ls's --dired option.
-(when (eq system-type 'darwin)
-  (setq dired-use-ls-dired nil))
+;; Dirvish sorts with GNU ls options such as --sort, and only GNU ls lists
+;; folders first.  macOS ships BSD ls, so use coreutils' gls when it is
+;; installed (brew install coreutils).  The shell's PATH is imported after
+;; this file loads, hence the Homebrew locations.
+(defvar my/dirvish-gnu-ls nil
+  "Non-nil when `insert-directory-program' accepts GNU ls options.")
+(setq my/dirvish-gnu-ls
+      (pcase system-type
+        ('gnu/linux t)
+        ('darwin
+         (when-let* ((gls (or (executable-find "gls")
+                              (seq-find #'file-executable-p
+                                        '("/opt/homebrew/bin/gls"
+                                          "/usr/local/bin/gls")))))
+           (setq insert-directory-program gls)
+           t))))
+;; BSD ls also lacks --dired.
+(setq dired-use-ls-dired my/dirvish-gnu-ls)
 
-;; Show dotfiles, but omit the synthetic . and .. entries (BSD/GNU ls).
-(setq dired-listing-switches "-lA")
+;; Show dotfiles, but omit the synthetic . and .. entries.
+(setq dired-listing-switches
+      (if my/dirvish-gnu-ls "-lA --group-directories-first" "-lA"))
 
 ;; Skip the mode/header-line spacer image so font metrics set the height.
 ;; A width of 0 merely hides the image and still reserves its fixed height.
 (setq dirvish-mode-line-bar-image-width nil)
 
-(dirvish-define-mode-line my-height
-  "Use the editor's status-bar height without adding horizontal padding."
-  (when (display-graphic-p) (my/ui-mode-line-space 0)))
-
-(setq dirvish-side-mode-line-format
-      (plist-put (copy-sequence dirvish-side-mode-line-format) :left
-                 (cons 'my-height
-                       (remq 'my-height
-                             (plist-get dirvish-side-mode-line-format :left)))))
+(defun my/dirvish-side-bars (dv)
+  "Give side session DV the New UI tool window header and status bar.
+The status bar is empty: it only continues the editor's along the frame's
+bottom edge.  Dirvish's composer measures each icon as one column, so it
+cannot right-align the header's toolbar."
+  (when (eq (dv-type dv) 'side)
+    (setf (dv-mode-line dv) '(:eval (when (display-graphic-p)
+                                      (my/ui-mode-line-space 0)))
+          (dv-header-line dv) '(:eval (my/dirvish-side-header)))))
+;; Sessions recompose their bars on creation and on every revert.
+(advice-add 'dirvish--check-dependencies :after #'my/dirvish-side-bars)
 
 ;; Share tab-line's font metrics and vertical padding, only in the sidebar.
 (require 'face-remap)
@@ -106,25 +124,268 @@ directory rows taller and renders wider than Emacs measures."
                                      'face hl-face)))
     `(ov . ,ov)))
 
-(defun my/dirvish-pad-project-title (title)
-  "Give the sidebar's TITLE the same vertical padding as buffer tabs."
-  (if-let* ((session (dirvish-curr))
-            ((eq (dv-type session) 'side)))
-      (concat (propertize " " 'face 'header-line
-                          'display (my/ui-header-space 0))
-              (propertize
-               (concat " " (file-name-nondirectory
-                             (directory-file-name
-                              (or (dirvish--vc-root-dir) default-directory))))
-               'face 'my/dirvish-project-title))
-    title))
+;;;; Sidebar header: the toolbar appears only while the sidebar is in use
 
-(with-eval-after-load 'dirvish-widgets
-  (advice-add 'dirvish-project-ml :filter-return #'my/dirvish-pad-project-title))
+;; Emacs reports no mouse enter or leave events for windows, so poll the
+;; pointer and redraw a sidebar's header only when it enters or leaves one.
+(defvar my/dirvish-side-hovered nil "The sidebar window under the mouse.")
+(defvar my/dirvish-side-hover-timer nil)
+
+(defun my/dirvish-side-track-hover ()
+  "Note which sidebar the mouse is over and redraw the bars that change."
+  (let* ((position (mouse-pixel-position))
+         (window (and (frame-live-p (car position)) (cadr position)
+                      (window-at-x-y (cadr position) (cddr position)
+                                     (car position))))
+         (hovered (and window
+                       (with-current-buffer (window-buffer window)
+                         (when-let* ((session (dirvish-curr)))
+                           (eq (dv-type session) 'side)))
+                       window)))
+    (unless (eq hovered my/dirvish-side-hovered)
+      (dolist (changed (list my/dirvish-side-hovered hovered))
+        (when (window-live-p changed)
+          (with-current-buffer (window-buffer changed)
+            (force-mode-line-update))))
+      (setq my/dirvish-side-hovered hovered))))
+
+(when (timerp my/dirvish-side-hover-timer)
+  (cancel-timer my/dirvish-side-hover-timer))
+(setq my/dirvish-side-hover-timer
+      (when (display-graphic-p)
+        (run-with-timer 0.15 0.15 #'my/dirvish-side-track-hover)))
+
+(defun my/dirvish-side-active-p ()
+  "Return non-nil if the sidebar whose header is drawn is focused or hovered.
+Headers are drawn with their window temporarily selected."
+  (or (mode-line-window-selected-p)
+      (eq (selected-window) my/dirvish-side-hovered)))
+
+(defface my/dirvish-toolbar-hover '((t (:inherit highlight)))
+  "Sidebar header button under the mouse." :group 'dirvish)
+
+(defconst my/dirvish-toolbar-padding 4
+  "Pixels on each side of a toolbar icon.")
+
+(defconst my/dirvish-toolbar-margin 6
+  "Pixels between the toolbar and the sidebar's right edge.")
+
+(defvar my/dirvish-side-buttons
+  '(("general/add" my/dirvish-side-new-menu "新建")
+    ("general/locate" my/dirvish-side-locate "定位当前文件")
+    ("general/expandAll" my/dirvish-side-expand-selected "展开选中目录")
+    ("general/collapseAll" dirvish-subtree-clear "全部折叠")
+    ("general/moreVertical" my/dirvish-side-options-menu "选项")
+    ("general/hide" dirvish-quit "隐藏侧栏"))
+  "Sidebar toolbar buttons as (ICON ACTION HELP).
+ACTION is a command, or a function called with the click event.")
+
+(defun my/dirvish-side-button (action help &rest strings)
+  "Return STRINGS as a header button running ACTION, with tooltip HELP.
+ACTION runs in the clicked sidebar; see `my/dirvish-side-buttons'."
+  (let ((map (make-sparse-keymap)))
+    ;; Act on press, like the status bar's menu; this also keeps the press
+    ;; from starting a header-line window resize.
+    (define-key map [header-line down-mouse-1]
+      (lambda (event)
+        (interactive "e")
+        (select-window (posn-window (event-start event)))
+        (if (commandp action)
+            (call-interactively action)
+          (funcall action event))))
+    (define-key map [header-line mouse-1] #'ignore)
+    (propertize (apply #'concat strings)
+                'local-map map 'help-echo help 'pointer 'hand
+                'mouse-face 'my/dirvish-toolbar-hover)))
+
+(defun my/dirvish-side-toolbar ()
+  "Return the sidebar's toolbar buttons."
+  (let ((pad (propertize " " 'display
+                         `(space :width (,my/dirvish-toolbar-padding)))))
+    (mapconcat (pcase-lambda (`(,icon ,action ,help))
+                 (my/dirvish-side-button
+                  action help pad
+                  (expui-icons-icon icon :face 'my/dirvish-neutral-icon) pad))
+               my/dirvish-side-buttons "")))
+
+(defun my/dirvish-side-header ()
+  "Return the sidebar's project title, and its toolbar while in use.
+As in a New UI tool window, the toolbar shows when focused or hovered."
+  (let* ((toolbar (when (my/dirvish-side-active-p)
+                    (concat (my/dirvish-side-toolbar)
+                            (propertize " " 'display
+                                        `(space :width (,my/dirvish-toolbar-margin))))))
+         (toolbar-width (if toolbar (string-pixel-width toolbar) 0))
+         (chevron (concat (propertize " " 'display '(space :width (2)))
+                          (expui-icons-icon "general/chevronDown"
+                                            :face 'my/dirvish-neutral-icon)))
+         ;; Mode-line formatting would read a % in the name as a construct.
+         (name (propertize
+                (string-replace
+                 "%" "%%" (concat " " (file-name-nondirectory
+                                        (directory-file-name
+                                         (or (dirvish--vc-root-dir)
+                                             default-directory)))))
+                'face 'my/dirvish-project-title))
+         ;; Shorten the title rather than let the window clip the toolbar.
+         (room (- (window-body-width nil t) toolbar-width
+                  (string-pixel-width chevron) 8)))
+    (concat (propertize " " 'face 'header-line 'display (my/ui-header-space 0))
+            (my/dirvish-side-button
+             #'my/dirvish-side-project-menu "切换项目"
+             (truncate-string-pixelwise name room (current-buffer) "…")
+             chevron)
+            (when toolbar
+              (concat (propertize
+                       " " 'display
+                       `(space :align-to (- (+ right right-fringe right-margin)
+                                            (,toolbar-width))))
+                      toolbar)))))
+
+(defun my/dirvish-side-in-editor (function &rest args)
+  "Call FUNCTION with ARGS, or interactively, from the last editor window.
+The sidebar's window is dedicated, so it cannot show other buffers."
+  (when-let* ((window (get-mru-window nil nil t)))
+    (select-window window))
+  (if args (apply function args) (call-interactively function)))
+
+(declare-function my/workspace-root-name "init-workspace" (root))
+
+(defun my/dirvish-side-project-menu (event)
+  "Pop up recent projects at EVENT, marking the frame's current one."
+  (let ((current (frame-parameter nil 'my/workspace-root))
+        (projects (and (fboundp 'my/workspace-projects)
+                       (seq-take (my/workspace-projects) 10))))
+    (popup-menu
+     `("项目"
+       ,@(mapcar (lambda (root)
+                   (vector (my/workspace-root-name root)
+                           `(my/dirvish-side-in-editor #'my/workspace-open ,root)
+                           :style 'radio :selected (equal root current)))
+                 projects)
+       ,@(and projects '("---"))
+       ["打开目录…" (my/dirvish-side-in-editor #'my/dirvish-open-directory)])
+     event)))
+
+(defun my/dirvish-side-new-menu (event)
+  "Pop up commands at EVENT creating entries in the directory at point."
+  (popup-menu '("新建"
+                ["文件…" dired-create-empty-file]
+                ["文件夹…" dired-create-directory])
+              event))
+
+(defun my/dirvish-side-locate ()
+  "Select the last editor window's file in the sidebar."
+  (interactive)
+  (let ((file (when-let* ((window (get-mru-window nil nil t)))
+                (buffer-file-name (window-buffer window)))))
+    (cond ((not file) (message "编辑区没有打开文件"))
+          ((not (file-in-directory-p file default-directory))
+           (message "%s 不在 %s 中" (file-name-nondirectory file)
+                    (abbreviate-file-name default-directory)))
+          (t (dirvish-subtree-expand-to file)))))
+
+(defvar my/dirvish-side-expand-limit 30
+  "Most directories one Expand Selected lists; each starts a process.")
+
+(defun my/dirvish-side-expand-selected ()
+  "Expand the directory at point and its subdirectories, up to a limit."
+  (interactive)
+  (let ((budget my/dirvish-side-expand-limit))
+    (cl-labels
+        ((directory-p ()
+           (when-let* ((file (dired-get-filename nil t)))
+             ;; A symlink may lead back into the tree being expanded.
+             (and (file-directory-p file) (not (file-symlink-p file)))))
+         (expand ()
+           (let ((depth (dirvish-subtree--depth)))
+             (unless (dirvish-subtree--expanded-p)
+               (condition-case nil
+                   (progn (dirvish-subtree--insert) (cl-decf budget))
+                 (error nil)))
+             (save-excursion
+               (while (and (> budget 0)
+                           (zerop (forward-line 1))
+                           (> (dirvish-subtree--depth) depth))
+                 (when (and (= (dirvish-subtree--depth) (1+ depth))
+                            (directory-p))
+                   (expand)))))))
+      (if (directory-p) (expand) (message "请先选中一个目录")))
+    (when (<= budget 0)
+      (message "已展开 %d 个目录，更深的目录保持折叠"
+               my/dirvish-side-expand-limit))))
+
+(defun my/dirvish-side-relist (remove &optional add)
+  "Relist the sidebar without switches matching REMOVE, then with ADD."
+  (setq dired-actual-switches
+        (string-join (append (seq-remove (lambda (switch)
+                                           (string-match-p remove switch))
+                                         (split-string dired-actual-switches))
+                             (and add (list add)))
+                     " "))
+  (revert-buffer))
+
+(defconst my/dirvish-side-sorts
+  '(("名称" nil) ("修改时间" "--sort=time") ("大小" "--sort=size")
+    ("类型" "--sort=extension"))
+  "Sidebar sort orders as (LABEL SWITCH); GNU ls sorts by name by default.")
+
+(defun my/dirvish-side-options-menu (event)
+  "Pop up the sidebar's sort and listing options at EVENT."
+  (let* ((switches (split-string dired-actual-switches))
+         (sort (seq-find (lambda (switch) (string-prefix-p "--sort=" switch))
+                         switches))
+         (toggle (lambda (label switch)
+                   (let ((on (member switch switches)))
+                     (vector label
+                             `(my/dirvish-side-relist
+                               ,(concat "\\`" (regexp-quote switch) "\\'")
+                               ,(unless on switch))
+                             :style 'toggle :selected (and on t)
+                             :active my/dirvish-gnu-ls))))
+         (count (length (directory-files default-directory nil
+                                         directory-files-no-dot-files-regexp t))))
+    (popup-menu
+     `("选项"
+       ,@(mapcar (pcase-lambda (`(,label ,switch))
+                   (vector (concat "按" label "排序")
+                           `(my/dirvish-side-relist "\\`--\\(sort\\|time\\)=" ,switch)
+                           :style 'radio :selected (equal switch sort)
+                           :active my/dirvish-gnu-ls))
+                 my/dirvish-side-sorts)
+       "---"
+       ,(funcall toggle "倒序" "--reverse")
+       ,(funcall toggle "文件夹置顶" "--group-directories-first")
+       "---"
+       ,(vector (format "共 %d 项" count) nil :active nil))
+     event)))
+
+;;;; Sidebar width
+
+(defvar my/dirvish-side-width-ratio 0.22
+  "Share of the frame's width a sidebar opens with, within the limits.")
+
+(defvar my/dirvish-side-width-limits '(220 . 300)
+  "Narrowest and widest width, in pixels, that a sidebar opens with.
+The narrowest still fits most names two levels deep; the widest is about
+a New UI tool window's.")
+
+(defun my/dirvish-side-width ()
+  "Return the selected frame's sidebar width in columns."
+  (let ((pixels (* my/dirvish-side-width-ratio (frame-pixel-width))))
+    (round (max (car my/dirvish-side-width-limits)
+                (min (cdr my/dirvish-side-width-limits) pixels))
+           (frame-char-width))))
+
+(defun my/dirvish-side-fit-width (create dv)
+  "CREATE the root window of side session DV as wide as the frame suits."
+  (let ((dirvish-side-width (my/dirvish-side-width)))
+    (funcall create dv)))
+;; Every way of opening the sidebar creates its window here.
+(advice-add 'dirvish-side-root-window-fn :around #'my/dirvish-side-fit-width)
 
 ;; Selection colors are supplied by ink-theme.el.
-(setq dirvish-side-width 30
-      dirvish-side-attributes '(subtree-state my-sidebar-icon)
+(setq dirvish-side-attributes '(subtree-state my-sidebar-icon)
       dirvish-side-auto-expand t)
 
 (dirvish-override-dired-mode 1)
@@ -207,14 +468,11 @@ Outside the sidebar, preserve Dired's usual mouse behavior."
       (my/dirvish-setup)
       (when-let* ((session (dirvish-curr))
                   ((eq (dv-type session) 'side)))
-        ;; Sessions cache their composed status bar; refresh it on reload too.
+        ;; Sessions cache their attributes and bars; refresh them on reload.
         (setf (dv-attributes session)
               (dirvish--attrs-expand dirvish-side-attributes))
         (dirvish-prop :attrs (dv-attributes session))
-        (setf (dv-mode-line session)
-              (dirvish--mode-line-composer
-               (plist-get dirvish-side-mode-line-format :left)
-               (plist-get dirvish-side-mode-line-format :right)))
+        (my/dirvish-side-bars session)
         (dirvish--setup-mode-line session)))))
 (force-mode-line-update t)
 

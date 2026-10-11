@@ -58,3 +58,15 @@
 [submodule "lisp/expui-icons"]
 	path = lisp/expui-icons
 	url = git@github.com:wwulfric/expui-icons.git
+[submodule "lisp/vertico"]
+	path = lisp/vertico
+	url = https://github.com/minad/vertico
+[submodule "lisp/orderless"]
+	path = lisp/orderless
+	url = https://github.com/oantolin/orderless
+[submodule "lisp/marginalia"]
+	path = lisp/marginalia
+	url = https://github.com/minad/marginalia
+[submodule "lisp/consult"]
+	path = lisp/consult
+	url = https://github.com/minad/consult

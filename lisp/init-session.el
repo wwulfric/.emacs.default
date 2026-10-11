@@ -23,10 +23,8 @@
       (rename-file old new))
     new))
 
-;; Must be set before smex and ido first read their files.
-(setq smex-save-file (my/var-migrate "smex-items" (my/var-file "smex-items"))
-      ido-save-directory-list-file (my/var-migrate "ido.last" (my/var-file "ido.last"))
-      project-list-file (my/var-migrate "projects" (my/var-file "projects")))
+;; Must be set before project.el first reads its file.
+(setq project-list-file (my/var-migrate "projects" (my/var-file "projects")))
 
 ;; Recent files feed the start page.  Never probe remote files at startup.
 (setq recentf-save-file (my/var-migrate "recentf" (my/var-file "recentf"))

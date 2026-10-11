@@ -32,16 +32,9 @@
   ;; Nor should the initial *scratch* linger as a tab.
   (set-window-prev-buffers nil nil))
 
-;; State files under var/; must precede smex, ido and project.el.
+;; State files under var/; must precede project.el.
 (require 'init-session)
 
-
-;; smex
-(require 'smex)
-(global-set-key (kbd "M-x") 'smex)
-(global-set-key (kbd "M-X") 'smex-major-mode-commands)
-;; This is your old M-x.
-(global-set-key (kbd "C-c C-c M-x") 'execute-extended-command)
 ;; ibuffer
 (global-set-key (kbd "C-x C-b") 'ibuffer)
 
@@ -52,19 +45,15 @@
 (setq original-y-or-n-p 'y-or-n-p)
 (fset 'yes-or-no-p 'y-or-n-p)
 
-(require 'flx-ido)
-(ido-mode 1)
-(ido-everywhere 1)
-(flx-ido-mode 1)
-(setq ido-enable-flex-matching t
-      ido-use-faces nil)
-
 (require 'auto-save)
 (auto-save-enable)
 (setq auto-save-silent t)
 
 ;; Frames, typography, tabs and sidebar.
 (require 'frame-setting)
+;; Minibuffer completion, shown in a floating panel.
+(require 'init-completion)
+(require 'init-palette)
 (require 'init-tab-line)
 (require 'init-dirvish)
 (require 'edit-up)

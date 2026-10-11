@@ -96,5 +96,307 @@
 (setq lsp-bridge-markdown-lsp-server "marksman")
 (setq markdown-command "pandoc")
 
+;;;; Pickers
+;; Choices about the symbol at point open beside it (init-palette.el);
+;; project-wide searches use the palette at the top of the frame.
+
+(require 'xref)
+(require 'consult-xref)
+(defvar my/palette-placement)
+
+(defun my/xref-at-point (fetcher alist &optional prompt)
+  "Choose among the xrefs of FETCHER beside the symbol at point.
+ALIST is passed to `consult-xref'; PROMPT replaces its default prompt."
+  (let ((my/palette-placement 'point)
+        (consult--customize-alist
+         (if prompt
+             (cons (cons #'consult-xref
+                         (append (list :prompt prompt)
+                                 (alist-get #'consult-xref consult--customize-alist)))
+                   consult--customize-alist)
+           consult--customize-alist)))
+    (consult-xref fetcher alist)))
+
+(setq xref-show-xrefs-function #'my/xref-at-point
+      xref-show-definitions-function #'my/xref-at-point)
+
+;; Implementations and references arrive as the text of lsp-bridge's
+;; reference buffer.  Show them as xrefs at point; C-c C-o opens that buffer,
+;; which can edit and replace every match.
+(defvar my/lsp-locations-kind "引用")
+
+(defun my/lsp-locations-implementations (&rest _)
+  (setq my/lsp-locations-kind "实现"))
+
+(defun my/lsp-locations-references (&rest _)
+  (setq my/lsp-locations-kind "引用"))
+
+(dolist (command '(lsp-bridge-find-impl lsp-bridge-find-impl-other-window))
+  (advice-add command :before #'my/lsp-locations-implementations))
+(advice-add 'lsp-bridge-find-references :before #'my/lsp-locations-references)
+
+;; Code lines are colored like their file: from its buffer when it is open,
+;; otherwise by its major mode in a scratch buffer without mode hooks.
+(defvar my/lsp-locations-fontify-limit 300
+  "Most locations whose code is colored like their file.")
+
+(defvar my/lsp-locations--scratch nil
+  "Scratch buffers that color code, as (MODE . BUFFER).")
+
+(defun my/lsp-locations--mode (file)
+  "Return the major mode that visiting FILE would use, or nil."
+  (let ((mode (assoc-default file auto-mode-alist #'string-match)))
+    (when (symbolp mode)
+      (when (fboundp 'major-mode-remap)
+        (setq mode (major-mode-remap mode)))
+      (and mode (fboundp mode) mode))))
+
+(defun my/lsp-locations--faces (string)
+  "Return STRING with its faces only: no invisible or display properties."
+  (let ((plain (substring-no-properties string)) (start 0))
+    (while (< start (length string))
+      (let ((next (next-single-property-change start 'face string (length string))))
+        (when-let* ((face (get-text-property start 'face string)))
+          (put-text-property start next 'face face plain))
+        (setq start next)))
+    plain))
+
+(defun my/lsp-locations--fontify (file row text)
+  "Return TEXT, line ROW of FILE, with the faces of FILE's major mode.
+Plain TEXT if coloring fails, so the list still opens."
+  (condition-case nil
+      (my/lsp-locations--faces (my/lsp-locations--fontify-1 file row text))
+    (error text)))
+
+(defun my/lsp-locations--fontify-1 (file row text)
+  "Return line ROW of FILE colored, from its buffer or from TEXT."
+  (if-let* ((buffer (find-buffer-visiting file)))
+      (with-current-buffer buffer
+        (save-excursion
+          (save-restriction
+            (widen)
+            (goto-char (point-min))
+            (forward-line (1- row))
+            (let ((beg (line-beginning-position)) (end (line-end-position)))
+              (font-lock-ensure beg end)
+              (buffer-substring beg end)))))
+    (if-let* ((mode (my/lsp-locations--mode file)))
+        (let ((scratch (alist-get mode my/lsp-locations--scratch)))
+          (unless (buffer-live-p scratch)
+            (setq scratch (generate-new-buffer (format " *color %s*" mode)))
+            (with-current-buffer scratch
+              ;; Mode hooks would start language servers and editing modes.
+              (delay-mode-hooks (funcall mode))
+              (setq buffer-undo-list t))
+            (setf (alist-get mode my/lsp-locations--scratch) scratch))
+          (with-current-buffer scratch
+            (erase-buffer)
+            (insert text)
+            (font-lock-ensure)
+            (buffer-string)))
+      text)))
+
+(defun my/lsp-locations-summary (file row text &optional plain)
+  "Return line ROW of FILE from TEXT, its match marked, indentation removed.
+TEXT carries lsp-bridge's terminal colors.  Unless PLAIN, color the code."
+  (let ((clean "") (start 0) match-start match-end)
+    (while (string-match "\e\\[\\([0-9;]*\\)m" text start)
+      (setq clean (concat clean (substring text start (match-beginning 0))))
+      (pcase (match-string 1 text)
+        ("94" (setq match-start (length clean)))
+        ("0" (when (and match-start (not match-end))
+               (setq match-end (length clean)))))
+      (setq start (match-end 0)))
+    (setq clean (concat clean (substring text start)))
+    (let ((code (if plain clean (my/lsp-locations--fontify file row clean))))
+      (when (and match-start match-end (<= match-end (length code)))
+        (add-face-text-property match-start match-end 'xref-match nil code))
+      (substring code (progn (string-match "\\`[ \t]*" code) (match-end 0))))))
+
+(defun my/lsp-locations-parse (content)
+  "Return xrefs for lsp-bridge reference CONTENT, or nil if a file is not local."
+  (let ((count 0) file items)
+    (catch 'remote
+      (dolist (line (split-string content "\n"))
+        (cond
+         ((string-match "\\`\e\\[95m\\(.*\\)\e\\[0m\\'" line)
+          (setq file (match-string 1 line))
+          (unless (and (file-name-absolute-p file) (file-exists-p file))
+            (throw 'remote nil)))
+         ((and file (string-match "\\`\\([0-9]+\\):\\([0-9]+\\):" line))
+          (let ((row (string-to-number (match-string 1 line)))
+                (column (string-to-number (match-string 2 line))))
+            (push (xref-make (my/lsp-locations-summary
+                              file row (substring line (match-end 0))
+                              (> (setq count (1+ count))
+                                 my/lsp-locations-fontify-limit))
+                             (xref-make-file-location file row column))
+                  items)))))
+      (nreverse items))))
+
+(defvar-keymap my/lsp-locations-map
+  "C-c C-o" (lambda () (interactive) (throw 'my/lsp-locations 'panel)))
+
+(defun my/lsp-locations-popup (original content counter position)
+  "Show lsp-bridge locations beside the symbol at point.
+ORIGINAL displays CONTENT, COUNTER and POSITION in lsp-bridge's buffer."
+  (let ((items (and (> counter 0) (display-graphic-p)
+                    (my/lsp-locations-parse content))))
+    (when (or (not items)
+              (eq 'panel
+                  (catch 'my/lsp-locations
+                    (minibuffer-with-setup-hook
+                        (:append (lambda ()
+                                   (use-local-map
+                                    (make-composed-keymap my/lsp-locations-map
+                                                          (current-local-map)))))
+                      (my/xref-at-point
+                       (lambda () items) nil
+                       (format "%s %s · %d  " my/lsp-locations-kind
+                               (or (thing-at-point 'symbol t) "") (length items))))
+                    nil)))
+      (funcall original content counter position))))
+
+(advice-add 'lsp-bridge-references--popup :around #'my/lsp-locations-popup)
+
+;; Rename edits the symbol where it is.
+(defun my/lsp-rename-at-point (original &rest args)
+  "Read the new name for ORIGINAL with ARGS beside the symbol."
+  (let ((my/palette-placement 'point))
+    (apply original args)))
+(advice-add 'lsp-bridge-rename :around #'my/lsp-rename-at-point)
+
+;; Workspace symbols: the language server matches while you type.
+(defconst my/lsp-symbol-kinds
+  ["" "file" "module" "namespace" "package" "class" "method" "property"
+   "field" "constructor" "enum" "interface" "function" "variable" "constant"
+   "string" "number" "boolean" "array" "object" "key" "null" "enum member"
+   "struct" "event" "operator" "type parameter"]
+  "Names of LSP SymbolKind values.")
+
+(defvar my/lsp-symbol--session nil "Minibuffer of the running symbol search.")
+(defvar my/lsp-symbol--window nil "Window whose language server is searched.")
+(defvar my/lsp-symbol--root nil "Directory that result paths are shown relative to.")
+(defvar my/lsp-symbol--candidates nil)
+(defvar my/lsp-symbol--index nil "Candidate string to symbol information.")
+(defvar my/lsp-symbol--query nil)
+(defvar my/lsp-symbol--timer nil)
+(defvar my/lsp-symbol-history nil)
+
+(defun my/lsp-symbol--table (string predicate action)
+  "Complete STRING with PREDICATE and ACTION among the server's results."
+  (if (eq action 'metadata)
+      '(metadata (category . lsp-symbol)
+                 (display-sort-function . identity)
+                 (cycle-sort-function . identity))
+    (complete-with-action action my/lsp-symbol--candidates string predicate)))
+
+(add-to-list 'completion-category-overrides '(lsp-symbol (styles my/passthrough)))
+
+(defun my/lsp-symbol--update (infos)
+  "Show the symbols INFOS in the running search."
+  (let ((root (expand-file-name my/lsp-symbol--root))
+        (index (make-hash-table :test #'equal))
+        (candidates nil))
+    (seq-doseq (info infos)
+      (let* ((location (plist-get info :location))
+             (file (lsp-bridge-pick-file-path (format "%s" (plist-get location :uri))))
+             (line (1+ (plist-get (plist-get (plist-get location :range) :start) :line)))
+             (kind (or (plist-get info :kind) 0))
+             (candidate
+              (concat (plist-get info :name) "  "
+                      (propertize
+                       (format "%s  %s:%d"
+                               (if (< -1 kind (length my/lsp-symbol-kinds))
+                                   (aref my/lsp-symbol-kinds kind) "")
+                               (if (string-prefix-p root file)
+                                   (substring file (length root))
+                                 (abbreviate-file-name file))
+                               line)
+                       'face 'completions-annotations))))
+        (unless (gethash candidate index)
+          (puthash candidate (cons file (plist-get (plist-get location :range) :start))
+                   index)
+          (push candidate candidates))))
+    (setq my/lsp-symbol--index index
+          my/lsp-symbol--candidates (nreverse candidates))
+    (when (buffer-live-p my/lsp-symbol--session)
+      (with-current-buffer my/lsp-symbol--session
+        (when (bound-and-true-p vertico--input)
+          (setq vertico--input t)
+          (vertico--exhibit))))))
+
+(defun my/lsp-symbol--request (query)
+  "Ask the language server for symbols matching QUERY."
+  (if (string-empty-p query)
+      (my/lsp-symbol--update nil)
+    (when (window-live-p my/lsp-symbol--window)
+      (with-current-buffer (window-buffer my/lsp-symbol--window)
+        (lsp-bridge-call-file-api "workspace_symbol" query)))))
+
+(defun my/lsp-symbol--schedule ()
+  "Request symbols for the input once typing pauses."
+  (let ((query (string-trim (minibuffer-contents-no-properties))))
+    (unless (equal query my/lsp-symbol--query)
+      (setq my/lsp-symbol--query query)
+      (when (timerp my/lsp-symbol--timer) (cancel-timer my/lsp-symbol--timer))
+      (setq my/lsp-symbol--timer
+            (run-with-idle-timer 0.15 nil #'my/lsp-symbol--request query)))))
+
+(defun my/lsp-symbol--receive (original info)
+  "Send INFO to the running search, or to ORIGINAL when there is none."
+  (if my/lsp-symbol--session
+      (my/lsp-symbol--update info)
+    (funcall original info)))
+(advice-add 'lsp-bridge-workspace--list-symbols :around #'my/lsp-symbol--receive)
+
+(defun my/lsp-workspace-symbol ()
+  "Go to a symbol anywhere in the project; the server matches as you type."
+  (interactive)
+  (unless (and (bound-and-true-p lsp-bridge-mode) (lsp-bridge-has-lsp-server-p))
+    (user-error "当前缓冲区没有语言服务器"))
+  (setq my/lsp-symbol--window (selected-window)
+        my/lsp-symbol--root (if-let* ((project (project-current)))
+                                (project-root project)
+                              default-directory)
+        my/lsp-symbol--candidates nil
+        my/lsp-symbol--index (make-hash-table :test #'equal)
+        my/lsp-symbol--query nil)
+  (let ((choice
+         (unwind-protect
+             (minibuffer-with-setup-hook
+                 (lambda ()
+                   (setq my/lsp-symbol--session (current-buffer))
+                   (add-hook 'post-command-hook #'my/lsp-symbol--schedule nil t))
+               (completing-read "符号：" #'my/lsp-symbol--table nil t
+                                (when (use-region-p)
+                                  (buffer-substring-no-properties
+                                   (region-beginning) (region-end)))
+                                'my/lsp-symbol-history))
+           (setq my/lsp-symbol--session nil)
+           (when (timerp my/lsp-symbol--timer) (cancel-timer my/lsp-symbol--timer)))))
+    (when-let* ((target (gethash choice my/lsp-symbol--index)))
+      (lsp-bridge-jump-to-file (car target) (cdr target)))))
+
+(require 'lsp-bridge-imenu)
+(setq lsp-bridge-imenu-function #'consult-imenu)
+
+(defun my/file-symbols ()
+  "Go to a symbol of this file, from the language server when there is one."
+  (interactive)
+  (if (and (bound-and-true-p lsp-bridge-mode) (lsp-bridge-has-lsp-server-p)
+           (not (memq major-mode lsp-bridge-raw-imenu-modes)))
+      (lsp-bridge-imenu)
+    (consult-imenu)))
+
+;; JetBrains macOS keys.  Cmd-click stays on s-mouse-1.
+(keymap-global-set "s-<f12>" #'my/file-symbols)          ; File structure
+(dolist (map (list lsp-bridge-mode-map lsp-bridge-source-mode-map))
+  (keymap-set map "s-b" #'lsp-bridge-find-def)          ; Declaration
+  (keymap-set map "M-s-b" #'lsp-bridge-find-impl)       ; Implementations
+  (keymap-set map "M-<f7>" #'lsp-bridge-find-references) ; Usages
+  (keymap-set map "S-<f6>" #'lsp-bridge-rename)          ; Rename
+  (keymap-set map "s-o" #'my/lsp-workspace-symbol))      ; Symbol
+
 
 (provide 'init-lsp)

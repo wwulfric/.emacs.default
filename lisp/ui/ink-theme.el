@@ -152,7 +152,11 @@
    `(completions-common-part ((t (:foreground ,accent))))
    `(completions-annotations ((t (:foreground ,muted :slant normal))))
    `(marginalia-key ((t (:inherit fixed-pitch :foreground ,muted))))
-   `(xref-match ((t (:foreground ,accent :weight bold))))
+   ;; Occurrences in listed code lines, as an editor highlights usages: a
+   ;; tint deeper than the selected row's, so it shows on that row too.
+   `(xref-match ((t (:background "#D3E0F2"))))
+   ;; No color of its own, so a group title of file names stays faded.
+   '(consult-file ((t nil)))
    '(consult-preview-line ((t (:inherit hl-line))))
    ;; Reading and writing: preserve actual emphasis and fixed-pitch tables.
    `(outline-1 ((t (:foreground ,fg :weight bold))))

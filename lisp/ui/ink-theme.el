@@ -128,18 +128,19 @@
    `(my/welcome-unavailable ((t (:foreground ,border :slant italic))))
    `(my/welcome-key ((t (:inherit fixed-pitch :foreground ,accent))))
    `(my/welcome-row ((t (:background ,selection))))
-   ;; Completion and Chinese input popups share the editor palette.
-   `(acm-frame-default-face ((t (:foreground ,fg :background ,surface))))
+   ;; Completion and Chinese input popups: white with a hairline, like the
+   ;; minibuffer panel (my/palette).
+   `(acm-frame-default-face ((t (:foreground ,fg :background ,bg))))
    `(acm-frame-border-face ((t (:background ,border))))
    `(acm-frame-select-face ((t (:foreground ,accent :background ,selection))))
-   `(rime-default-face ((t (:foreground ,fg :background ,surface))))
+   `(rime-default-face ((t (:foreground ,fg :background ,bg))))
    `(rime-code-face ((t (:foreground ,string))))
    `(rime-cursor-face ((t (:foreground ,bg :background ,accent))))
    `(rime-highlight-candidate-face ((t (:foreground ,accent :background ,selection :weight bold))))
    `(rime-comment-face ((t (:foreground ,comment))))
    `(rime-candidate-num-face ((t (:foreground ,muted))))
-   ;; Floating minibuffer: the popup surface, a hairline and one accent.
-   `(my/palette ((t (:foreground ,fg :background ,surface))))
+   ;; Floating minibuffer: white like the other popups, a hairline and one accent.
+   `(my/palette ((t (:foreground ,fg :background ,bg))))
    `(my/palette-border ((t (:background ,border))))
    `(minibuffer-nonselected ((t (:foreground ,muted))))
    `(vertico-current ((t (:foreground ,accent :background ,selection :extend t))))

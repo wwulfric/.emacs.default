@@ -12,6 +12,12 @@
 
 (setq default-input-method "rime"
      rime-show-candidate 'posframe )
+
+;; White with a hairline (the `child-frame-border' face), like the other
+;; popups; fringes and line spacing pad the candidates instead of a border.
+(setq rime-posframe-properties
+      '(:border-width 1 :left-fringe 10 :right-fringe 10
+        :override-parameters ((line-spacing . (0.35 . 0.35)))))
 (setq rime-user-data-dir (concat (global/load-file-path) "../rime" ))
 
 (setq rime-disable-predicates

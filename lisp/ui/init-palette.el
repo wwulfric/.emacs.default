@@ -71,7 +71,7 @@ With the rows' own spacing they match the side padding.")
   "Frame pixel position (X Y LINE-HEIGHT) of the symbol for `point'.")
 
 (defvar-local my/palette--width 0
-  "Widest panel at point so far; it never narrows while typing.")
+  "Width in columns of the panel at point, fixed after its first display.")
 
 ;;;; Placement
 
@@ -123,7 +123,6 @@ With the rows' own spacing they match the side padding.")
   (let* ((buffer (current-buffer))
          (input (point))
          (anchor (and (eq my/palette--placement 'point) my/palette--anchor))
-         (min-width (max (car my/palette-point-width) my/palette--width))
          (origin (my/palette--origin))
          (frame
           ;; Poshandlers measure the editor window, not the minibuffer.
@@ -135,8 +134,11 @@ With the rows' own spacing they match the side padding.")
                :poshandler (if anchor #'my/palette--below-symbol
                              #'my/palette--top-center)
                :poshandler-extra-info (list :anchor anchor)
-               :width (unless anchor (my/palette--columns origin))
-               :min-width (when anchor min-width)
+               ;; At point the first display fits the content; the width
+               ;; then stays, so typing or moving never resizes it.
+               :width (cond ((not anchor) (my/palette--columns origin))
+                            ((> my/palette--width 0) my/palette--width))
+               :min-width (when anchor (car my/palette-point-width))
                :max-width (when anchor (cdr my/palette-point-width))
                :lines-truncate t
                :cursor (default-value 'cursor-type)
@@ -154,7 +156,8 @@ With the rows' own spacing they match the side padding.")
                :override-parameters `((line-spacing . ,my/palette-line-spacing))
                :hidehandler #'my/palette--hidehandler)))))
     (when anchor
-      (setq my/palette--width (max my/palette--width (frame-width frame))))
+      (when (zerop my/palette--width)
+        (setq my/palette--width (frame-width frame))))
     ;; Fringes are the horizontal padding: paint them like the panel.
     (let ((color (face-background 'my/palette nil t)))
       (unless (equal (face-background 'fringe frame t) color)

@@ -23,7 +23,8 @@
       (expand-file-name "langserver" (file-name-directory
                                      (or load-file-name buffer-file-name))))
 
-;; Cmd-click: peek at a definition, otherwise jump to the definition.
+;; Cmd-click: jump to the definition, or list usages when clicking the
+;; definition itself, as in JetBrains IDEs.
 ;; macOS maps Command to Super by default.
 (defvar my/lsp-click-context nil)
 
@@ -31,7 +32,7 @@
   (setq my/lsp-click-context nil))
 
 (defun my/lsp-click (event)
-  "Find the clicked symbol's definition, or peek if already there."
+  "Find the clicked symbol's definition, or its usages if already there."
   (interactive "e")
   (mouse-set-point event)
   (my/lsp-click-clear-context)
@@ -48,8 +49,9 @@
                     bounds)))
       (lsp-bridge-find-def))))
 
-(defun my/lsp-click-maybe-peek (original filename filehost position)
-  "Turn a definition response at the clicked symbol into Peek."
+(defun my/lsp-click-maybe-usages (original filename filehost position)
+  "Turn a definition response at the clicked symbol into its usages.
+Otherwise call ORIGINAL with FILENAME, FILEHOST and POSITION to jump."
   (let ((context my/lsp-click-context))
     (my/lsp-click-clear-context)
     (if (and context
@@ -64,12 +66,12 @@
              (let ((target (acm-backend-lsp-position-to-point position))
                    (bounds (nth 3 context)))
                (and (<= (car bounds) target) (< target (cdr bounds)))))
-        (lsp-bridge-peek)
+        (lsp-bridge-find-references)
       (funcall original filename filehost position))))
 
 ;; A later user command must not reuse an earlier click's context.
 (add-hook 'pre-command-hook #'my/lsp-click-clear-context)
-(advice-add 'lsp-bridge-define--jump :around #'my/lsp-click-maybe-peek)
+(advice-add 'lsp-bridge-define--jump :around #'my/lsp-click-maybe-usages)
 (define-key lsp-bridge-mode-map (kbd "<s-down-mouse-1>") #'ignore)
 (define-key lsp-bridge-mode-map (kbd "<s-mouse-1>") #'my/lsp-click)
 ;; Read-only dependency sources use the same gesture without starting HLS.

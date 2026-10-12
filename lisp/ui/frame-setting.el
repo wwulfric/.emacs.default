@@ -386,6 +386,21 @@ reading margins remain independent."
 (dolist (frame (frame-list))
   (my/frame-apply-window-padding frame))
 
+(defun my/frame-apply-echo-area-padding (frame)
+  "Pad the echo area of GUI FRAME like editor text.
+Otherwise its text starts at the frame edge, under the rounded corner."
+  (when (and (display-graphic-p frame) (not (frame-parent frame)))
+    (let ((window (minibuffer-window frame)))
+      (when (and (window-live-p window) (eq (window-frame window) frame)
+                 (not (equal (window-fringes window)
+                             (list my/ui-editor-padding my/ui-editor-padding nil t))))
+        ;; Persistent: the window switches between echo area and minibuffer.
+        (set-window-fringes window my/ui-editor-padding my/ui-editor-padding nil t)))))
+
+(add-hook 'after-make-frame-functions #'my/frame-apply-echo-area-padding)
+(dolist (frame (frame-list))
+  (my/frame-apply-echo-area-padding frame))
+
 (defface fallback '((t :family "Fira Code"
                        :inherit shadow))
   "Fallback glyphs for truncation and continuation indicators."

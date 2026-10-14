@@ -315,6 +315,14 @@ up, for hints that apply to one picker only."
     ;; The bottom line changes height: fit the panel once it shows.
     (run-at-time 0 nil #'my/palette--refit (current-buffer))))
 
+(defun my/palette-text-width ()
+  "Return the columns for candidate text in this minibuffer's panel, or nil."
+  (when-let* ((my/palette--placement)
+              (frame (bound-and-true-p posframe--frame))
+              ((frame-live-p frame)))
+    (- (window-body-width (frame-root-window frame))
+       (ceiling my/palette-indent (frame-char-width frame)))))
+
 (defun my/palette--replace-prompt ()
   "Show an icon instead of the prompt, which the title replaces.
 The prompt's last character becomes the space before the input."

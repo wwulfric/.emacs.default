@@ -106,6 +106,7 @@ Otherwise call ORIGINAL with FILENAME, FILEHOST and POSITION to jump."
 (require 'consult-xref)
 (defvar my/palette-placement)
 (declare-function my/palette-set-footer "init-palette" (footer))
+(declare-function my/palette-text-width "init-palette" ())
 
 (defun my/xref-at-point (fetcher alist &optional prompt)
   "Choose among the xrefs of FETCHER beside the symbol at point.
@@ -303,35 +304,69 @@ ORIGINAL displays CONTENT, COUNTER and POSITION in lsp-bridge's buffer."
 
 (add-to-list 'completion-category-overrides '(lsp-symbol (styles my/passthrough)))
 
+(defconst my/lsp-symbol-name-width 40
+  "Widest name column; longer names are cut short.")
+
 (defun my/lsp-symbol--update (infos)
-  "Show the symbols INFOS in the running search."
-  (let ((root (expand-file-name my/lsp-symbol--root))
-        (index (make-hash-table :test #'equal))
-        (candidates nil))
-    (seq-doseq (info infos)
-      (let* ((location (plist-get info :location))
-             (file (lsp-bridge-pick-file-path (format "%s" (plist-get location :uri))))
-             (line (1+ (plist-get (plist-get (plist-get location :range) :start) :line)))
-             (kind (or (plist-get info :kind) 0))
-             (candidate
-              (concat (plist-get info :name) "  "
-                      (propertize
-                       (format "%s  %s:%d"
-                               (if (< -1 kind (length my/lsp-symbol-kinds))
-                                   (aref my/lsp-symbol-kinds kind) "")
-                               (if (string-prefix-p root file)
-                                   (substring file (length root))
-                                 (abbreviate-file-name file))
-                               line)
-                       'face 'completions-annotations))))
+  "Show the symbols INFOS in the running search.
+Names, kinds and places form columns as wide as the widest of them."
+  (let* ((root (expand-file-name my/lsp-symbol--root))
+         (index (make-hash-table :test #'equal))
+         (rows
+          (seq-map
+           (lambda (info)
+             (let* ((location (plist-get info :location))
+                    (file (lsp-bridge-pick-file-path
+                           (format "%s" (plist-get location :uri))))
+                    (start (plist-get (plist-get location :range) :start))
+                    (kind (or (plist-get info :kind) 0)))
+               (list (plist-get info :name)
+                     (if (< -1 kind (length my/lsp-symbol-kinds))
+                         (aref my/lsp-symbol-kinds kind) "")
+                     (format "%s:%d"
+                             (if (string-prefix-p root file)
+                                 (substring file (length root))
+                               (abbreviate-file-name file))
+                             (1+ (plist-get start :line)))
+                     (cons file start))))
+           infos))
+         (name-width (min my/lsp-symbol-name-width
+                          (apply #'max 0 (mapcar (lambda (row) (string-width (nth 0 row)))
+                                                 rows))))
+         (kind-width (apply #'max 0 (mapcar (lambda (row) (string-width (nth 1 row)))
+                                            rows)))
+         ;; Places keep their end, the file and line, within the panel.
+         (place-width (max 12 (- (or (and (buffer-live-p my/lsp-symbol--session)
+                                          (fboundp 'my/palette-text-width)
+                                          (with-current-buffer my/lsp-symbol--session
+                                            (my/palette-text-width)))
+                                     100)
+                                 name-width kind-width 5)))
+         (candidates nil))
+    (pcase-dolist (`(,name ,kind ,place ,target) rows)
+      (let ((candidate
+             (concat (truncate-string-to-width name name-width nil ?\s "…") "  "
+                     (propertize (concat (truncate-string-to-width kind kind-width nil ?\s)
+                                         "  "
+                                         (if (> (string-width place) place-width)
+                                             (concat "…" (substring place (- 1 place-width)))
+                                           place))
+                                 'face 'completions-annotations))))
         (unless (gethash candidate index)
-          (puthash candidate (cons file (plist-get (plist-get location :range) :start))
-                   index)
+          (puthash candidate target index)
           (push candidate candidates))))
     (setq my/lsp-symbol--index index
           my/lsp-symbol--candidates (nreverse candidates))
     (when (buffer-live-p my/lsp-symbol--session)
       (with-current-buffer my/lsp-symbol--session
+        ;; An empty list says why: nothing typed, or nothing indexed yet.
+        (when (fboundp 'my/palette-set-footer)
+          (my/palette-set-footer
+           (cond ((string-empty-p (or my/lsp-symbol--query ""))
+                  (propertize "Type to search symbols in the project" 'face 'shadow))
+                 ((null candidates)
+                  (propertize "No symbols found. The server may still be indexing."
+                              'face 'shadow)))))
         (when (bound-and-true-p vertico--input)
           (setq vertico--input t)
           (vertico--exhibit))))))
@@ -340,6 +375,11 @@ ORIGINAL displays CONTENT, COUNTER and POSITION in lsp-bridge's buffer."
   "Ask the language server for symbols matching QUERY."
   (if (string-empty-p query)
       (my/lsp-symbol--update nil)
+    ;; Only while nothing is listed, so typing does not resize the panel.
+    (when (and (fboundp 'my/palette-set-footer) (null my/lsp-symbol--candidates)
+               (buffer-live-p my/lsp-symbol--session))
+      (with-current-buffer my/lsp-symbol--session
+        (my/palette-set-footer (propertize "Searching…" 'face 'shadow))))
     (when (window-live-p my/lsp-symbol--window)
       (with-current-buffer (window-buffer my/lsp-symbol--window)
         (lsp-bridge-call-file-api "workspace_symbol" query)))))

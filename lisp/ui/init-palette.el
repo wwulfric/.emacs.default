@@ -10,13 +10,24 @@
 ;; The child frame only displays the minibuffer buffer.  The minibuffer
 ;; window stays selected and is scrolled out of sight, so focus never leaves
 ;; the editor frame: key maps, input methods, recursive minibuffers and
-;; `minibuffer-message' keep working.  Vertico draws the candidates (see
-;; init-completion.el); this file only places and frames them.  Messages still
-;; appear in the echo area.
+;; `minibuffer-message' keep working.  Messages sent meanwhile show in the
+;; panel too.  Vertico draws the candidates (see init-completion.el); this
+;; file places and frames them:
+;;
+;;     Recent                             1 / 22     title and count
+;;     🔍 init                                        input
+;;     ──────────────────────────────────────────     divider
+;;     Buffer                                         group title
+;;   ▎ 📄 init-lsp.el               ~/.emacs.d/lisp/  selected row
+;;     📄 init-completion.el
+;;
+;; Titles, icons and the footer share an outer column; the input and the
+;; candidates' names an inner one.
 
 ;;; Code:
 
 (require 'posframe)
+(require 'expui-icons)
 (require 'thingatpt)
 
 (defvar vertico-count)
@@ -30,9 +41,31 @@
   "One-pixel outline of the floating minibuffer panel."
   :group 'faces)
 
+(defface my/palette-title '((t (:inherit shadow)))
+  "Title above the input of the floating minibuffer panel."
+  :group 'faces)
+
+(defface my/palette-divider '((t (:strike-through "gray85")))
+  "Line between the input and the candidates of the panel."
+  :group 'faces)
+
+(defface my/palette-mark '((t (:background "RoyalBlue")))
+  "Bar at the left of the selected candidate in the panel."
+  :group 'faces)
+
 (defvar my/palette-placement 'palette
   "Where the next minibuffer appears: `palette', `point', or nil for the echo area.
 Let-bind it around code that reads from the minibuffer.")
+
+(defvar my/palette-titles
+  '((execute-extended-command . "Commands")
+    (project-find-file . "Go to File")
+    (find-file . "Open File")
+    (consult-buffer . "Recent")
+    (consult-ripgrep . "Find in Files")
+    (consult-imenu . "File Structure")
+    (my/file-symbols . "File Structure"))
+  "Panel titles by command.  Other completions take their prompt as title.")
 
 (defvar my/palette-ignore-commands
   '(eval-expression edebug-eval-expression debugger-eval-expression
@@ -61,8 +94,30 @@ Expressions keep ElDoc beside them; live filters keep their page in view.")
 (defconst my/palette-border-width 1)
 
 (defvar my/palette-edge-height 80
-  "Height in 1/10 pt of the empty header and mode lines padding the panel.
-With the rows' own spacing they match the side padding.")
+  "Height in 1/10 pt of the empty mode line padding the panel's bottom.
+With the rows' own spacing it matches the side padding.")
+
+(defvar my/palette-header-height 0.85
+  "Height of the title line relative to the panel text.")
+
+(defvar my/palette-header-padding 8
+  "Space above and below the title line, in pixels.")
+
+(defvar my/palette-input-height 1.1
+  "Height of the input relative to the candidates.")
+
+(defconst my/palette-indent 28
+  "Pixels before the input and candidate text, holding the bar and icons.")
+
+(defconst my/palette-icon-indent 6
+  "Pixels before the outer column, after the bar of the selected candidate.
+It holds the title, the search icon, group titles, icons and the footer;
+the input and the candidates' names start at `my/palette-indent'.")
+
+(defconst my/palette-mark-width 3
+  "Width in pixels of the bar marking the selected candidate.")
+
+(declare-function my/completion-icon "init-completion" (candidate))
 
 (defvar-local my/palette--placement nil
   "Placement of this minibuffer session, or nil when it is not floating.")
@@ -72,6 +127,18 @@ With the rows' own spacing they match the side padding.")
 
 (defvar-local my/palette--width 0
   "Width in columns of the panel at point, fixed after its first display.")
+
+(defvar-local my/palette--footer nil
+  "Text of the line at the bottom of the panel, or nil for none.")
+
+(defvar-local my/palette--line-face nil
+  "Face attributes of a panel's title and footer lines.")
+
+(defvar-local my/palette--edge-face nil
+  "Face attributes of a panel's empty lines padding its top or bottom.")
+
+(defvar-local my/palette--title nil
+  "Title of this completion session, or nil when it shows its prompt.")
 
 ;;;; Placement
 
@@ -191,6 +258,136 @@ With the rows' own spacing they match the side padding.")
   "Hide a panel described by INFO once its minibuffer is no longer active."
   (not (minibufferp (cdr (plist-get info :posframe-buffer)) t)))
 
+;;;; Structure
+
+(defun my/palette--title ()
+  "Return the title for this minibuffer: its command's, else its prompt."
+  (let ((title (or (alist-get this-command my/palette-titles)
+                   (string-trim (minibuffer-prompt) "[ \t]+" "[ \t:：]+"))))
+    (unless (string-empty-p title) title)))
+
+(defun my/palette--count ()
+  "Return the position and number of candidates, or nil without any."
+  (when (and (bound-and-true-p vertico--input) (boundp 'vertico--total)
+             (> vertico--total 0))
+    (if (>= vertico--index 0)
+        (format "%d / %d" (1+ vertico--index) vertico--total)
+      (number-to-string vertico--total))))
+
+(defun my/palette--header ()
+  "Return the title line: the title at the left, the count at the right."
+  (let ((count (my/palette--count)))
+    (concat (my/palette--space-to my/palette-icon-indent)
+            (and my/palette--title
+                 (propertize my/palette--title 'face 'my/palette-title))
+            (when count
+              (let ((width (string-pixel-width
+                            (propertize count 'face
+                                        `(:height ,my/palette-header-height)))))
+                (concat (propertize " " 'display
+                                    `(space :align-to (- right (,width))))
+                        (propertize count 'face 'shadow)))))))
+
+(defun my/palette--remap (line spec)
+  "Draw LINE, `header-line' or `mode-line', with face attributes SPEC.
+The minibuffer window has neither line, so only the panel shows them."
+  (dolist (face (list line (intern (format "%s-active" line))
+                      (intern (format "%s-inactive" line))))
+    (when (facep face)
+      (setq-local face-remapping-alist
+                  (cons (cons face spec)
+                        (assq-delete-all face (copy-sequence face-remapping-alist)))))))
+
+(defun my/palette--footer ()
+  "Return the bottom line: the footer, or a blank line padding the panel."
+  (if my/palette--footer
+      (concat (my/palette--space-to my/palette-icon-indent) my/palette--footer)
+    " "))
+
+(defun my/palette-set-footer (footer)
+  "Show FOOTER, a string, at the bottom of this minibuffer's panel.
+A nil FOOTER removes it.  Call it in the minibuffer once the panel is set
+up, for hints that apply to one picker only."
+  (when (and my/palette--placement (not (equal footer my/palette--footer)))
+    (setq my/palette--footer footer)
+    (my/palette--remap 'mode-line (if footer my/palette--line-face
+                                    my/palette--edge-face))
+    ;; The bottom line changes height: fit the panel once it shows.
+    (run-at-time 0 nil #'my/palette--refit (current-buffer))))
+
+(defun my/palette--replace-prompt ()
+  "Show an icon instead of the prompt, which the title replaces.
+The prompt's last character becomes the space before the input."
+  (let ((end (minibuffer-prompt-end)))
+    (when (> end (1+ (point-min)))
+      (let ((icon (make-overlay (point-min) (1- end))))
+        ;; JetBrains' search icon, in the face's color in the mono style.
+        ;; Display strings ignore display properties inside them, so the
+        ;; image is the display itself.
+        (overlay-put icon 'display (or (and (expui-icons-svg-p)
+                                            (expui-icons-image "general/search"))
+                                       "🔍"))
+        (overlay-put icon 'face 'shadow)
+        (overlay-put icon 'before-string (my/palette--space-to my/palette-icon-indent))))
+    (when (> end (point-min))
+      ;; A display string would ignore an alignment inside it.
+      (overlay-put (make-overlay (1- end) end) 'display
+                   `(space :align-to (,my/palette-indent))))))
+
+(defun my/palette--space-to (x)
+  "Return a space reaching X pixels from the start of the text area."
+  (propertize " " 'display `(space :align-to (,x))))
+
+(defun my/palette--divider-args (args)
+  "Put a line before the candidate lines in ARGS when they show in a panel."
+  (pcase-let ((`(,lines) args))
+    (if (and my/palette--placement lines)
+        (list (cons (concat (propertize " " 'face 'my/palette-divider
+                                        'display '(space :align-to right))
+                            (propertize "\n" 'face 'my/palette-divider))
+                    lines))
+      args)))
+
+(defun my/palette--space (width)
+  "Return a space WIDTH pixels wide."
+  (propertize " " 'display `(space :width (,(max 0 width)))))
+
+(defun my/palette--format-candidate (format cand prefix &rest args)
+  "Call FORMAT with CAND, PREFIX and ARGS, indenting panel candidates.
+The indentation holds a bar for the selected candidate, then the icon of a
+file or buffer below the search icon, so that names line up with the input.
+Vertico puts a space before every alignment in a candidate, so the
+indentation is made of exact widths instead."
+  (apply format cand
+         (if my/palette--placement
+             (let* ((icon (and (fboundp 'my/completion-icon)
+                               (my/completion-icon cand)))
+                    (icon-width (if icon (car (image-size (get-text-property
+                                                           0 'display icon)
+                                                          t))
+                                  0))
+                    (mark (when (= (nth 1 args) vertico--index)
+                            (propertize (my/palette--space my/palette-mark-width)
+                                        'face 'my/palette-mark)))
+                    (used (if mark my/palette-mark-width 0)))
+               (concat mark
+                       (when icon
+                         (prog1 (concat (my/palette--space
+                                         (- my/palette-icon-indent used))
+                                        icon)
+                           (setq used (+ my/palette-icon-indent icon-width))))
+                       (my/palette--space (- my/palette-indent used))
+                       prefix))
+           prefix)
+         args))
+
+(defun my/palette--format-group-title (title)
+  "Indent group TITLE in a panel like the panel title, outside its items."
+  (if my/palette--placement
+      (concat (my/palette--space-to my/palette-icon-indent)
+              title)
+    title))
+
 ;;;; Session
 
 (defun my/palette--setup ()
@@ -202,22 +399,39 @@ With the rows' own spacing they match the side padding.")
   (when my/palette--placement
     (setq my/palette--width 0
           my/palette--anchor (and (eq my/palette--placement 'point)
-                                  (my/palette--symbol-anchor (my/palette--origin))))
+                                  (my/palette--symbol-anchor (my/palette--origin)))
+          ;; Plain prompts, such as a new name, keep their wording.
+          my/palette--title (and (bound-and-true-p vertico--input)
+                                 (my/palette--title)))
     (setq-local vertico-count (alist-get my/palette--placement my/palette-rows)
                 truncate-lines t
                 auto-hscroll-mode 'current-line
-                ;; Empty header and mode lines pad the panel above and below.
-                header-line-format " "
-                mode-line-format " ")
-    (let ((edge `(:height ,my/palette-edge-height :box nil :overline nil
-                          :underline nil :inherit nil
-                          :background ,(face-background 'my/palette nil t))))
-      ;; The minibuffer window has neither line, so only the panel shows them.
-      (dolist (face '(header-line header-line-active header-line-inactive
-                      mode-line mode-line-active mode-line-inactive))
-        (when (facep face)
-          (setq-local face-remapping-alist
-                      (cons (cons face edge) face-remapping-alist)))))
+                ;; The header line holds the title; an empty mode line pads
+                ;; the bottom.
+                header-line-format '(:eval (my/palette--header))
+                mode-line-format '(:eval (my/palette--footer)))
+    (let* ((background (face-background 'my/palette nil t))
+           (plain `(:box nil :overline nil :underline nil :inherit nil
+                         :background ,background))
+           (edge `(:height ,my/palette-edge-height ,@plain)))
+      (setq my/palette--footer nil
+            my/palette--edge-face edge
+            my/palette--line-face
+            `(:height ,my/palette-header-height
+                      ,@plain :box (:line-width (0 . ,my/palette-header-padding)
+                                                :color ,background)))
+      ;; Without completion the header line is empty, padding like the
+      ;; mode line.
+      (my/palette--remap 'header-line (if (bound-and-true-p vertico--input)
+                                          my/palette--line-face
+                                        edge))
+      (my/palette--remap 'mode-line edge))
+    (let ((start (minibuffer-prompt-end)))
+      (when my/palette--title
+        (my/palette--replace-prompt))
+      ;; Typed text grows the overlay, so it keeps the larger size.
+      (overlay-put (make-overlay start (point-max) nil nil t)
+                   'face `(:height ,my/palette-input-height)))
     ;; A header line shows only once the frame is tall enough for it, so
     ;; fit the panel again after its first redisplay.
     (run-at-time 0 nil #'my/palette--refit (current-buffer))
@@ -248,6 +462,8 @@ Deferred so that a prompt which directly follows reuses the visible panel."
   "Show BUFFER's panel again if its minibuffer is still active."
   (when (and (minibufferp buffer t)
              (buffer-local-value 'my/palette--placement buffer))
+    ;; Let the header line appear first, so the fit counts it.
+    (redisplay)
     (with-current-buffer buffer
       (my/palette--display))))
 
@@ -271,6 +487,12 @@ Deferred so that a prompt which directly follows reuses the visible panel."
         (add-hook 'minibuffer-setup-hook #'my/palette--setup 50)
         (advice-add 'vertico--display-candidates :after #'my/palette--after-candidates)
         (advice-add 'vertico--resize-window :around #'my/palette--vertico-resize)
+        (advice-add 'vertico--display-candidates :filter-args
+                    #'my/palette--divider-args)
+        (advice-add 'vertico--format-candidate :around
+                    #'my/palette--format-candidate)
+        (advice-add 'vertico--format-group-title :filter-return
+                    #'my/palette--format-group-title)
         (with-eval-after-load 'consult
           (when my/palette-mode
             (setq consult-after-jump-hook
@@ -280,6 +502,9 @@ Deferred so that a prompt which directly follows reuses the visible panel."
     (remove-hook 'minibuffer-setup-hook #'my/palette--setup)
     (advice-remove 'vertico--display-candidates #'my/palette--after-candidates)
     (advice-remove 'vertico--resize-window #'my/palette--vertico-resize)
+    (advice-remove 'vertico--display-candidates #'my/palette--divider-args)
+    (advice-remove 'vertico--format-candidate #'my/palette--format-candidate)
+    (advice-remove 'vertico--format-group-title #'my/palette--format-group-title)
     (when (boundp 'consult-after-jump-hook)
       (setq consult-after-jump-hook
             (cons #'recenter (remq #'my/palette-recenter consult-after-jump-hook))))))

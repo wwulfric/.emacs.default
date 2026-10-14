@@ -17,6 +17,7 @@
 (require 'consult)
 (require 'consult-xref)
 (require 'consult-imenu)
+(require 'expui-icons)
 
 ;;;; Vertico
 
@@ -37,12 +38,30 @@
 (keymap-set vertico-map "M-DEL" #'vertico-directory-delete-word)
 (add-hook 'rfn-eshadow-update-overlay-hook #'vertico-directory-tidy)
 
+;; Group titles are small and faded instead of a ruled line.
+(setq vertico-group-format "%s")
+
 (defun my/completion-dim-directory (candidate)
   "Dim the directory part of file CANDIDATE so its name stands out."
   (let ((end (string-match-p "[^/]*/?\\'" candidate)))
     (when (and end (> end 0))
       (add-face-text-property 0 end 'shadow t candidate))
     candidate))
+
+(defun my/completion-icon (candidate)
+  "Return the icon of file or buffer CANDIDATE, or nil.
+The icons are those of the sidebar and the tabs; init-palette.el places
+them below its search icon."
+  (when (expui-icons-svg-p)
+    (pcase-let ((`(,category . ,target)
+                 ;; Mixed lists such as `consult-buffer' tag each candidate.
+                 (or (get-text-property 0 'multi-category candidate)
+                     (cons (completion-metadata-get vertico--metadata 'category)
+                           candidate))))
+      (pcase category
+        ((or 'file 'project-file) (expui-icons-icon-for-file target))
+        ('buffer (when-let* ((buffer (get-buffer target)))
+                   (expui-icons-icon-for-buffer buffer)))))))
 
 (defun my/completion-format-file (format candidate &rest args)
   "Call FORMAT with CANDIDATE and ARGS, dimming directories of file candidates."

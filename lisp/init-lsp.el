@@ -105,6 +105,7 @@ Otherwise call ORIGINAL with FILENAME, FILEHOST and POSITION to jump."
 (require 'xref)
 (require 'consult-xref)
 (defvar my/palette-placement)
+(declare-function my/palette-set-footer "init-palette" (footer))
 
 (defun my/xref-at-point (fetcher alist &optional prompt)
   "Choose among the xrefs of FETCHER beside the symbol at point.
@@ -251,11 +252,18 @@ ORIGINAL displays CONTENT, COUNTER and POSITION in lsp-bridge's buffer."
                         (:append (lambda ()
                                    (use-local-map
                                     (make-composed-keymap my/lsp-locations-map
-                                                          (current-local-map)))))
+                                                          (current-local-map)))
+                                   ;; The buffer is the only way to edit
+                                   ;; every match, so name its key.
+                                   (my/palette-set-footer
+                                    (concat (propertize "C-c C-o" 'face 'my/palette-title)
+                                            "  "
+                                            (propertize "Open all in an editable buffer"
+                                                        'face 'shadow)))))
                       (my/xref-at-point
                        (lambda () items) nil
-                       (format "%s %s · %d  " my/lsp-locations-kind
-                               (or (thing-at-point 'symbol t) "") (length items))))
+                       (format "%s of %s: " my/lsp-locations-kind
+                               (or (thing-at-point 'symbol t) ""))))
                     nil)))
       (funcall original content counter position))))
 

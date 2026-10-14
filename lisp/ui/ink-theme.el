@@ -142,9 +142,12 @@
    ;; Floating minibuffer: white like the other popups, a hairline and one accent.
    `(my/palette ((t (:foreground ,fg :background ,bg))))
    `(my/palette-border ((t (:background ,border))))
+   `(my/palette-title ((t (:foreground ,structure))))
+   `(my/palette-divider ((t (:strike-through ,section-rule :height 0.5))))
+   `(my/palette-mark ((t (:background ,accent))))
    `(minibuffer-nonselected ((t (:foreground ,muted))))
    `(vertico-current ((t (:foreground ,accent :background ,selection :extend t))))
-   `(vertico-group-title ((t (:foreground ,muted :slant normal))))
+   `(vertico-group-title ((t (:foreground ,muted :slant normal :height 0.85))))
    `(vertico-group-separator ((t (:foreground ,section-rule :strike-through t))))
    `(orderless-match-face-0 ((t (:foreground ,accent :weight bold))))
    '(orderless-match-face-1 ((t (:inherit orderless-match-face-0))))

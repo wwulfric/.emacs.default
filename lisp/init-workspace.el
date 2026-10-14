@@ -76,7 +76,7 @@
         (with-temp-buffer
           (insert-file-contents file)
           (read (current-buffer)))
-      (error (message "无法读取 %s：%s" (abbreviate-file-name file)
+      (error (message "Cannot read %s: %s" (abbreviate-file-name file)
                       (error-message-string err))
              nil))))
 
@@ -357,7 +357,7 @@ the saved workspace."
     (when (and (frame-live-p frame) (frame-parameter frame 'my/workspace-root))
       (condition-case err
           (my/workspace-save frame)
-        (error (message "保存工作区失败：%s" (error-message-string err)))))))
+        (error (message "Saving the workspace failed: %s" (error-message-string err)))))))
 
 ;;;; Restore
 
@@ -384,7 +384,7 @@ the saved workspace."
                 (list buffer
                       (clamp (plist-get entry :start))
                       (clamp (plist-get entry :point))))))
-        (error (message "无法恢复 %s：%s" file (error-message-string err))
+        (error (message "Cannot restore %s: %s" file (error-message-string err))
                nil)))))
 
 (defun my/workspace--append-tab (window kind opened)
@@ -571,14 +571,17 @@ restores the frame size and position."
       (my/workspace--apply-history frame))
     (message "%s"
              (if layout
-                 (concat (format "已恢复 %s：%d 个窗口 · %d 个标签"
-                                 (my/workspace-root-name root)
-                                 (my/workspace--count layout 'windows)
-                                 (my/workspace--count layout 'tabs))
-                         (if (> my/workspace--missing 0)
-                             (format "（%d 个文件已不存在，已跳过）" my/workspace--missing)
-                           ""))
-               (format "已打开 %s" (my/workspace-root-name root))))))
+                 (let ((windows (my/workspace--count layout 'windows))
+                       (tabs (my/workspace--count layout 'tabs)))
+                   (concat (format "Restored %s: %d window%s · %d tab%s"
+                                   (my/workspace-root-name root)
+                                   windows (if (= windows 1) "" "s")
+                                   tabs (if (= tabs 1) "" "s"))
+                           (if (> my/workspace--missing 0)
+                               (format " (skipped %d missing file%s)" my/workspace--missing
+                                       (if (= my/workspace--missing 1) "" "s"))
+                             "")))
+               (format "Opened %s" (my/workspace-root-name root))))))
 
 ;;;; Commands
 
@@ -614,7 +617,7 @@ frame's saved size and position."
 (defun my/workspace-current-root ()
   "Return the selected frame's project root or signal a user error."
   (or (frame-parameter nil 'my/workspace-root)
-      (user-error "当前窗口没有打开项目")))
+      (user-error "No project is open in this frame")))
 
 (defun my/workspace-revert ()
   "Discard the current layout and return to the last saved workspace."

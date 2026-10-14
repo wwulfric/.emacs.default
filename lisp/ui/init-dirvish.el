@@ -171,12 +171,12 @@ Headers are drawn with their window temporarily selected."
   "Pixels between the toolbar and the sidebar's right edge.")
 
 (defvar my/dirvish-side-buttons
-  '(("general/add" my/dirvish-side-new-menu "新建")
-    ("general/locate" my/dirvish-side-locate "定位当前文件")
-    ("general/expandAll" my/dirvish-side-expand-selected "展开选中目录")
-    ("general/collapseAll" dirvish-subtree-clear "全部折叠")
-    ("general/moreVertical" my/dirvish-side-options-menu "选项")
-    ("general/hide" dirvish-quit "隐藏侧栏"))
+  '(("general/add" my/dirvish-side-new-menu "New")
+    ("general/locate" my/dirvish-side-locate "Select Opened File")
+    ("general/expandAll" my/dirvish-side-expand-selected "Expand Selected")
+    ("general/collapseAll" dirvish-subtree-clear "Collapse All")
+    ("general/moreVertical" my/dirvish-side-options-menu "Options")
+    ("general/hide" dirvish-quit "Hide"))
   "Sidebar toolbar buttons as (ICON ACTION HELP).
 ACTION is a command, or a function called with the click event.")
 
@@ -232,7 +232,7 @@ As in a New UI tool window, the toolbar shows when focused or hovered."
                   (string-pixel-width chevron) 8)))
     (concat (propertize " " 'face 'header-line 'display (my/ui-header-space 0))
             (my/dirvish-side-button
-             #'my/dirvish-side-project-menu "切换项目"
+             #'my/dirvish-side-project-menu "Switch Project"
              (truncate-string-pixelwise name room (current-buffer) "…")
              chevron)
             (when toolbar
@@ -257,21 +257,21 @@ The sidebar's window is dedicated, so it cannot show other buffers."
         (projects (and (fboundp 'my/workspace-projects)
                        (seq-take (my/workspace-projects) 10))))
     (popup-menu
-     `("项目"
+     `("Projects"
        ,@(mapcar (lambda (root)
                    (vector (my/workspace-root-name root)
                            `(my/dirvish-side-in-editor #'my/workspace-open ,root)
                            :style 'radio :selected (equal root current)))
                  projects)
        ,@(and projects '("---"))
-       ["打开目录…" (my/dirvish-side-in-editor #'my/dirvish-open-directory)])
+       ["Open Directory…" (my/dirvish-side-in-editor #'my/dirvish-open-directory)])
      event)))
 
 (defun my/dirvish-side-new-menu (event)
   "Pop up commands at EVENT creating entries in the directory at point."
-  (popup-menu '("新建"
-                ["文件…" dired-create-empty-file]
-                ["文件夹…" dired-create-directory])
+  (popup-menu '("New"
+                ["File…" dired-create-empty-file]
+                ["Directory…" dired-create-directory])
               event))
 
 (defun my/dirvish-side-locate ()
@@ -279,9 +279,9 @@ The sidebar's window is dedicated, so it cannot show other buffers."
   (interactive)
   (let ((file (when-let* ((window (get-mru-window nil nil t)))
                 (buffer-file-name (window-buffer window)))))
-    (cond ((not file) (message "编辑区没有打开文件"))
+    (cond ((not file) (message "No file is open in the editor"))
           ((not (file-in-directory-p file default-directory))
-           (message "%s 不在 %s 中" (file-name-nondirectory file)
+           (message "%s is not in %s" (file-name-nondirectory file)
                     (abbreviate-file-name default-directory)))
           (t (dirvish-subtree-expand-to file)))))
 
@@ -310,9 +310,9 @@ The sidebar's window is dedicated, so it cannot show other buffers."
                  (when (and (= (dirvish-subtree--depth) (1+ depth))
                             (directory-p))
                    (expand)))))))
-      (if (directory-p) (expand) (message "请先选中一个目录")))
+      (if (directory-p) (expand) (message "Select a directory first")))
     (when (<= budget 0)
-      (message "已展开 %d 个目录，更深的目录保持折叠"
+      (message "Expanded %d directories; deeper ones stay collapsed"
                my/dirvish-side-expand-limit))))
 
 (defun my/dirvish-side-relist (remove &optional add)
@@ -326,8 +326,8 @@ The sidebar's window is dedicated, so it cannot show other buffers."
   (revert-buffer))
 
 (defconst my/dirvish-side-sorts
-  '(("名称" nil) ("修改时间" "--sort=time") ("大小" "--sort=size")
-    ("类型" "--sort=extension"))
+  '(("Name" nil) ("Modification Time" "--sort=time") ("Size" "--sort=size")
+    ("Type" "--sort=extension"))
   "Sidebar sort orders as (LABEL SWITCH); GNU ls sorts by name by default.")
 
 (defun my/dirvish-side-options-menu (event)
@@ -346,18 +346,18 @@ The sidebar's window is dedicated, so it cannot show other buffers."
          (count (length (directory-files default-directory nil
                                          directory-files-no-dot-files-regexp t))))
     (popup-menu
-     `("选项"
+     `("Options"
        ,@(mapcar (pcase-lambda (`(,label ,switch))
-                   (vector (concat "按" label "排序")
+                   (vector (concat "Sort by " label)
                            `(my/dirvish-side-relist "\\`--\\(sort\\|time\\)=" ,switch)
                            :style 'radio :selected (equal switch sort)
                            :active my/dirvish-gnu-ls))
                  my/dirvish-side-sorts)
        "---"
-       ,(funcall toggle "倒序" "--reverse")
-       ,(funcall toggle "文件夹置顶" "--group-directories-first")
+       ,(funcall toggle "Descending" "--reverse")
+       ,(funcall toggle "Folders First" "--group-directories-first")
        "---"
-       ,(vector (format "共 %d 项" count) nil :active nil))
+       ,(vector (format "%d item%s" count (if (= count 1) "" "s")) nil :active nil))
      event)))
 
 ;;;; Sidebar width

@@ -946,7 +946,7 @@ move to the margin until the cursor edits them.
 Setext underlines stay in place.
 Fonts, spacing and wrapping are independent:
 see `my/writing-typography-mode'."
-  :lighter " 阅读" :group 'my-writing
+  :lighter " Reading" :group 'my-writing
   (if my/writing-layout-mode
       (unless my/writing--saved-state
         (setq my/writing--saved-state

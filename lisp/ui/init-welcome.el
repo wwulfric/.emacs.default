@@ -52,16 +52,21 @@ Chinese text uses a taller fallback font; a common strut keeps rows even.")
 
 ;;;; Formatting helpers
 
+(defun my/welcome-ago (count unit)
+  "Describe COUNT (a float) of UNIT ago, such as \"3 days ago\"."
+  (let ((count (truncate count)))
+    (format "%d %s%s ago" count unit (if (= count 1) "" "s"))))
+
 (defun my/welcome-relative-time (time)
   "Describe float TIME relative to now."
   (if (not time) ""
     (let ((seconds (- (float-time) time)))
-      (cond ((< seconds 60) "刚刚")
-            ((< seconds 3600) (format "%d 分钟前" (/ seconds 60)))
-            ((< seconds 86400) (format "%d 小时前" (/ seconds 3600)))
-            ((< seconds 172800) "昨天")
-            ((< seconds 604800) (format "%d 天前" (/ seconds 86400)))
-            ((< seconds 2592000) (format "%d 周前" (/ seconds 604800)))
+      (cond ((< seconds 60) "just now")
+            ((< seconds 3600) (format "%d min ago" (/ seconds 60)))
+            ((< seconds 86400) (my/welcome-ago (/ seconds 3600) "hour"))
+            ((< seconds 172800) "yesterday")
+            ((< seconds 604800) (my/welcome-ago (/ seconds 86400) "day"))
+            ((< seconds 2592000) (my/welcome-ago (/ seconds 604800) "week"))
             (t (format-time-string "%Y-%m-%d" time))))))
 
 (defun my/welcome-fit (string width)
@@ -101,7 +106,7 @@ Chinese text uses a taller fallback font; a common strut keeps rows even.")
          (info (propertize (if available
                                (my/welcome-relative-time (or (plist-get meta :opened)
                                                              (plist-get meta :saved)))
-                             "不可用")
+                             "unavailable")
                            'face (if available 'my/welcome-meta 'my/welcome-unavailable)))
          (show-branch (>= content 78))
          (path-width (max 10 (- content 2 3 20 2 (if show-branch 16 0) 2 12))))
@@ -227,15 +232,16 @@ and CJK glyphs that a column count gets wrong."
     (erase-buffer)
     (insert (make-string (max 1 (/ (- height body) 3)) ?\n))
     (let ((title "Emacs")
-          (subtitle (format "%s · %d 个项目" emacs-version (length all))))
+          (subtitle (format "%s · %d project%s" emacs-version (length all)
+                            (if (= (length all) 1) "" "s"))))
       (my/welcome-insert-centered (propertize title 'face 'my/welcome-title))
       (my/welcome-insert-centered (propertize subtitle 'face 'my/welcome-subtitle)))
     (insert "\n")
     (my/welcome-insert-line
      indent (my/welcome-heading-line
-             "最近项目"
-             (if (string-empty-p my/welcome-filter) "/ 过滤"
-               (format "过滤：%s" my/welcome-filter))
+             "Recent Projects"
+             (if (string-empty-p my/welcome-filter) "/ Filter"
+               (format "Filter: %s" my/welcome-filter))
              content))
     (my/welcome-insert-line indent (propertize (make-string content ?─) 'face 'my/welcome-rule))
     (if projects
@@ -244,11 +250,11 @@ and CJK glyphs that a column count gets wrong."
                  do (my/welcome-insert-line indent (my/welcome-project-row root index content)
                                             (cons 'project root) content))
       (my/welcome-insert-line
-       indent (propertize (if all "没有匹配的项目" "还没有项目，按 o 打开一个目录")
+       indent (propertize (if all "No matching projects" "No projects yet. Press o to open a directory.")
                           'face 'shadow)))
     (when files
       (insert "\n")
-      (my/welcome-insert-line indent (propertize "最近文件" 'face 'my/welcome-heading))
+      (my/welcome-insert-line indent (propertize "Recent Files" 'face 'my/welcome-heading))
       (dolist (file files)
         (my/welcome-insert-line indent
                                 (concat "     " (propertize (my/welcome-fit-left
@@ -258,12 +264,12 @@ and CJK glyphs that a column count gets wrong."
                                 (cons 'file file) content)))
     (insert "\n")
     (my/welcome-insert-line indent (propertize (make-string content ?─) 'face 'my/welcome-rule))
-    (my/welcome-insert-line indent (my/welcome-hints '(("RET" . "打开") ("1-9" . "快速打开")
-                                                       ("C-u RET" . "新窗口打开")
-                                                       ("o" . "打开目录…"))))
-    (my/welcome-insert-line indent (my/welcome-hints '(("*" . "置顶") ("d" . "从列表移除")
-                                                       ("/" . "过滤") ("g" . "刷新")
-                                                       ("q" . "关闭"))))
+    (my/welcome-insert-line indent (my/welcome-hints '(("RET" . "Open") ("1-9" . "Quick open")
+                                                       ("C-u RET" . "Open in new window")
+                                                       ("o" . "Open directory…"))))
+    (my/welcome-insert-line indent (my/welcome-hints '(("*" . "Pin") ("d" . "Remove from list")
+                                                       ("/" . "Filter") ("g" . "Refresh")
+                                                       ("q" . "Close"))))
     (goto-char (point-min))
     (let ((match (and selected (text-property-search-forward 'my/welcome-target selected t))))
       (goto-char (if match (prop-match-beginning match) (point-min)))
@@ -309,10 +315,10 @@ and CJK glyphs that a column count gets wrong."
   (pcase target
     (`(project . ,root)
      (unless (my/welcome-available-p root)
-       (user-error "目录不可用：%s" root))
+       (user-error "Directory unavailable: %s" root))
      (my/workspace-open root nil new-frame))
     (`(file . ,file) (find-file file))
-    (_ (user-error "这一行没有可打开的内容"))))
+    (_ (user-error "Nothing to open on this line"))))
 
 (defun my/welcome-open (&optional new-frame)
   "Open the selected row; with NEW-FRAME open the project in a new frame."
@@ -323,7 +329,7 @@ and CJK glyphs that a column count gets wrong."
   "Open the Nth listed project."
   (if-let* ((root (nth (1- n) my/welcome-entries)))
       (my/welcome-open-target (cons 'project root))
-    (user-error "没有第 %d 个项目" n)))
+    (user-error "No project %d" n)))
 
 (defun my/welcome-click (event)
   "Open the row clicked in EVENT."
@@ -333,14 +339,14 @@ and CJK glyphs that a column count gets wrong."
 
 (defun my/welcome-open-directory (directory)
   "Open DIRECTORY's project, or DIRECTORY itself, as a workspace."
-  (interactive (list (read-directory-name "打开目录：" "~/" nil t)))
+  (interactive (list (read-directory-name "Open directory: " "~/" nil t)))
   (my/workspace-open (my/workspace-root-of directory)))
 
 (defun my/welcome-project-at-point ()
   "Return the project root of the current row or signal a user error."
   (pcase (my/welcome-target)
     (`(project . ,root) root)
-    (_ (user-error "请先选中一个项目"))))
+    (_ (user-error "Select a project first"))))
 
 (defun my/welcome-toggle-pin ()
   "Pin the selected project to the top, or unpin it."
@@ -358,7 +364,7 @@ and CJK glyphs that a column count gets wrong."
       (my/welcome-previous 1))
     (my/workspace-forget root)
     (my/welcome-render)
-    (message "已从列表移除 %s" (my/welcome-display-path root))))
+    (message "Removed %s from the list" (my/welcome-display-path root))))
 
 (defun my/welcome-filter ()
   "Narrow the list while typing; an empty input or C-g clears the filter."
@@ -374,7 +380,7 @@ and CJK glyphs that a column count gets wrong."
                               (setq my/welcome-filter text)
                               (my/welcome-render))))
                         nil t))
-          (read-string "过滤项目：" my/welcome-filter))
+          (read-string "Filter projects: " my/welcome-filter))
       (quit (with-current-buffer buffer
               (setq my/welcome-filter "")
               (my/welcome-render))))))

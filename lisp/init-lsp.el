@@ -125,13 +125,13 @@ ALIST is passed to `consult-xref'; PROMPT replaces its default prompt."
 ;; Implementations and references arrive as the text of lsp-bridge's
 ;; reference buffer.  Show them as xrefs at point; C-c C-o opens that buffer,
 ;; which can edit and replace every match.
-(defvar my/lsp-locations-kind "引用")
+(defvar my/lsp-locations-kind "Usages")
 
 (defun my/lsp-locations-implementations (&rest _)
-  (setq my/lsp-locations-kind "实现"))
+  (setq my/lsp-locations-kind "Implementations"))
 
 (defun my/lsp-locations-references (&rest _)
-  (setq my/lsp-locations-kind "引用"))
+  (setq my/lsp-locations-kind "Usages"))
 
 (dolist (command '(lsp-bridge-find-impl lsp-bridge-find-impl-other-window))
   (advice-add command :before #'my/lsp-locations-implementations))
@@ -356,7 +356,7 @@ ORIGINAL displays CONTENT, COUNTER and POSITION in lsp-bridge's buffer."
   "Go to a symbol anywhere in the project; the server matches as you type."
   (interactive)
   (unless (and (bound-and-true-p lsp-bridge-mode) (lsp-bridge-has-lsp-server-p))
-    (user-error "当前缓冲区没有语言服务器"))
+    (user-error "No language server for this buffer"))
   (setq my/lsp-symbol--window (selected-window)
         my/lsp-symbol--root (if-let* ((project (project-current)))
                                 (project-root project)
@@ -370,7 +370,7 @@ ORIGINAL displays CONTENT, COUNTER and POSITION in lsp-bridge's buffer."
                  (lambda ()
                    (setq my/lsp-symbol--session (current-buffer))
                    (add-hook 'post-command-hook #'my/lsp-symbol--schedule nil t))
-               (completing-read "符号：" #'my/lsp-symbol--table nil t
+               (completing-read "Symbol: " #'my/lsp-symbol--table nil t
                                 (when (use-region-p)
                                   (buffer-substring-no-properties
                                    (region-beginning) (region-end)))

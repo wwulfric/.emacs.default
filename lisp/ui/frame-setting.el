@@ -135,7 +135,7 @@
           (if (/= lsp-bridge-diagnostic-count
                   (length (bound-and-true-p lsp-bridge-diagnostic-records)))
               ;; Records can be capped or filtered: don't mislabel the total.
-              (format "诊断 %d" lsp-bridge-diagnostic-count)
+              (format "Diagnostics %d" lsp-bridge-diagnostic-count)
             (let ((errors 0) (warnings 0))
               (dolist (record lsp-bridge-diagnostic-records)
                 (pcase (plist-get record :severity)
@@ -170,7 +170,7 @@
 When DISABLE is non-nil, explicitly turn the mode off rather than toggle it."
   (lambda ()
     (interactive)
-    (unless (buffer-live-p buffer) (user-error "原缓冲区已关闭"))
+    (unless (buffer-live-p buffer) (user-error "The buffer has been killed"))
     (with-current-buffer buffer
       (if disable
           (let ((current-prefix-arg -1)) (call-interactively function))
@@ -187,21 +187,21 @@ When DISABLE is non-nil, explicitly turn the mode off rather than toggle it."
     ;; Insert in reverse order: define-key prepends items to a sparse keymap.
     (when (commandp command)
       (define-key menu [disable]
-        `(menu-item ,(if (local-variable-p mode) "关闭此模式" "关闭此模式（全局）")
+        `(menu-item ,(if (local-variable-p mode) "Turn Off" "Turn Off (Global)")
                     ,(my/ui-mode-menu-action buffer command t))))
     (when (keymapp map)
       (define-key menu [bindings]
-        `(menu-item "快捷键"
+        `(menu-item "Key Bindings"
                     ,(my/ui-mode-menu-action
                       buffer (lambda () (describe-keymap map))))))
     (define-key menu [help]
-      `(menu-item "帮助"
+      `(menu-item "Help"
                   ,(my/ui-mode-menu-action
                     buffer (lambda ()
                              (if (fboundp command) (describe-function command)
                                (describe-variable mode))))))
     (when (keymapp native)
-      (define-key menu [native] `(menu-item "模式操作" ,native)))
+      (define-key menu [native] `(menu-item "Mode Actions" ,native)))
     menu))
 
 (defun my/ui-visible-mode-lighters ()
@@ -225,8 +225,8 @@ Preserve `minor-mode-alist' order and respect Emacs' collapse preference."
 
 (defun my/ui-build-mode-menu ()
   "Build native visible modes first, with other enabled modes in a submenu."
-  (let* ((menu (make-sparse-keymap "模式"))
-         (more-menu (make-sparse-keymap "更多已启用模式"))
+  (let* ((menu (make-sparse-keymap "Modes"))
+         (more-menu (make-sparse-keymap "More Enabled Modes"))
          (buffer (current-buffer)))
     (run-hooks 'activate-menubar-hook 'menu-bar-update-hook)
     (let* ((visible (my/ui-visible-mode-lighters))
@@ -234,32 +234,32 @@ Preserve `minor-mode-alist' order and respect Emacs' collapse preference."
                                (my/ui-enabled-minor-modes)))
            (native-menus (minor-mode-key-binding [menu-bar])))
       (define-key menu [help]
-        `(menu-item "全部模式帮助" ,(my/ui-mode-menu-action buffer #'describe-mode)))
+        `(menu-item "Help for All Modes" ,(my/ui-mode-menu-action buffer #'describe-mode)))
       (when others
         (dolist (mode (reverse others))
           (define-key more-menu (vector mode)
             `(menu-item ,(concat (symbol-name mode)
-                                 (unless (local-variable-p mode) " [全局]"))
+                                 (unless (local-variable-p mode) " [global]"))
                         ,(my/ui-minor-mode-menu mode native-menus))))
         (define-key menu [more]
-          `(menu-item ,(format "更多已启用模式 (%d)" (length others)) ,more-menu)))
+          `(menu-item ,(format "More Enabled Modes (%d)" (length others)) ,more-menu)))
       (dolist (entry (reverse visible))
         (define-key menu (vector (car entry))
           `(menu-item ,(concat (cdr entry)
-                               (unless (local-variable-p (car entry)) " [全局]"))
+                               (unless (local-variable-p (car entry)) " [global]"))
                       ,(my/ui-minor-mode-menu (car entry) native-menus)))))
     (let* ((major (make-sparse-keymap (symbol-name major-mode)))
            (native (and (current-local-map)
                         (lookup-key (current-local-map) [menu-bar])))
            (map (current-local-map)))
       (define-key major [help]
-        `(menu-item "帮助" ,(my/ui-mode-menu-action buffer #'describe-mode)))
+        `(menu-item "Help" ,(my/ui-mode-menu-action buffer #'describe-mode)))
       (when (keymapp map)
         (define-key major [bindings]
-          `(menu-item "快捷键" ,(my/ui-mode-menu-action
+          `(menu-item "Key Bindings" ,(my/ui-mode-menu-action
                                  buffer (lambda () (describe-keymap map))))))
       (when (keymapp native)
-        (define-key major [native] `(menu-item "模式操作" ,native)))
+        (define-key major [native] `(menu-item "Mode Actions" ,native)))
       (define-key menu [major]
         `(menu-item ,(or (and (stringp mode-name) mode-name) (symbol-name major-mode))
                     ,major)))
@@ -290,15 +290,15 @@ package-owned local mode lines by changing only the default format."
          (tabbed (and (bound-and-true-p tab-line-mode) tab-line-format))
          (flags (delq nil
                       (list (when (and (not tabbed) (buffer-modified-p)) "●")
-                            (when buffer-read-only "只读")
-                            (when (buffer-narrowed-p) "窄域")
-                            (when defining-kbd-macro "录制")
+                            (when buffer-read-only "Read-only")
+                            (when (buffer-narrowed-p) "Narrowed")
+                            (when defining-kbd-macro "Recording")
                             (when (and active current-input-method)
                               current-input-method-title))))
          (writing (and active (>= width 65)
                        (delq nil
-                             (list (when (bound-and-true-p my/writing-layout-mode) "阅读")
-                                   (when (bound-and-true-p my/writing-numbering-mode) "编号")))))
+                             (list (when (bound-and-true-p my/writing-layout-mode) "Reading")
+                                   (when (bound-and-true-p my/writing-numbering-mode) "Numbering")))))
          (position (and active
                         (format "%s  %d%%"
                                 (format-mode-line "%l:%c")
@@ -322,7 +322,7 @@ package-owned local mode lines by changing only the default format."
      (my/ui-mode-line-space (if (display-graphic-p) (list my/ui-status-padding) 1))
      (propertize "☰" 'local-map my/ui-mode-menu-map
                  'mouse-face 'mode-line-highlight
-                 'help-echo "左键/右键：模式操作、已启用的次要模式与快捷键；中键：全部模式帮助")
+                 'help-echo "Left or right click: mode actions, enabled minor modes and key bindings\nMiddle click: help for all modes")
      " " (string-replace "%" "%%" left)
      (when (not (string-empty-p right))
        (propertize " " 'display

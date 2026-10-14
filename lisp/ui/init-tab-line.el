@@ -136,8 +136,8 @@ Process buffers can be created without running a major-mode hook."
         (with-current-buffer tab
           (put-text-property
            0 end 'help-echo
-           (format "依赖源码（只读）\n来源：%s\n文件：%s"
-                   (or (lsp-bridge-source-origin-directory) "未知项目")
+           (format "Dependency source (read-only)\nOrigin: %s\nFile: %s"
+                   (or (lsp-bridge-source-origin-directory) "unknown project")
                    buffer-file-name)
            label))
         (add-face-text-property

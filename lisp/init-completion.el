@@ -99,12 +99,30 @@ them below its search icon."
 
 ;;;; Annotations
 
-;; Commands show only their keys, like a command palette; files show none.
-;; M-A cycles to the detailed annotations.
+;; Commands show only their keys, like a command palette; files show none;
+;; buffers show where they are, as their icon tells the type.  M-A cycles to
+;; the detailed annotations.
+(defun my/completion-annotate-buffer (cand)
+  "Annotate buffer CAND with its directory and a dot if it is modified."
+  (when-let* ((buffer (get-buffer cand))
+              ((buffer-live-p buffer)))
+    (let ((directory (or (when-let* ((file (buffer-file-name buffer)))
+                           (file-name-directory file))
+                         (and (provided-mode-derived-p
+                               (buffer-local-value 'major-mode buffer) 'dired-mode)
+                              (buffer-local-value 'default-directory buffer)))))
+      (marginalia--fields
+       ((and directory (abbreviate-file-name directory))
+        :truncate -0.5 :face 'marginalia-file-name)
+       ((if (and (buffer-file-name buffer) (buffer-modified-p buffer)) "●" " ")
+        :face 'marginalia-modified)))))
+
 (setq marginalia-align 'right
       marginalia-field-width 40)
 (setf (alist-get 'command marginalia-annotators)
       '(marginalia-annotate-binding marginalia-annotate-command builtin none)
+      (alist-get 'buffer marginalia-annotators)
+      '(my/completion-annotate-buffer marginalia-annotate-buffer builtin none)
       (alist-get 'file marginalia-annotators)
       '(none marginalia-annotate-file builtin)
       (alist-get 'project-file marginalia-annotators)

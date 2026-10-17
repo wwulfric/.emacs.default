@@ -18,6 +18,38 @@
     (funcall original force)))
 (advice-add 'acm-frame-init-colors :around #'my/acm-init-theme-colors)
 
+;; Completion menus, their documentation and hover documentation share the
+;; minibuffer panel's padding and row spacing (init-palette.el).
+(defvar my/palette-padding)
+(defvar my/palette-line-spacing)
+
+(defun my/acm-frame-style (frame)
+  "Pad and space the rows of acm popup FRAME like the minibuffer panel."
+  (modify-frame-parameters frame `((left-fringe . ,my/palette-padding)
+                                   (right-fringe . ,my/palette-padding)
+                                   (line-spacing . ,my/palette-line-spacing)))
+  (set-face-background 'fringe (face-background 'acm-frame-default-face nil t) frame)
+  frame)
+(advice-add 'acm-frame-make-frame :filter-return #'my/acm-frame-style)
+
+(defun my/lsp-hover-from-top (&rest _)
+  "Show hover documentation from its start, the signature, as plain text.
+Its buffer is filled with point at the end, which a frame shorter than the
+text would scroll to; its Markdown mode also resets the buffer's cursor
+and wrapping settings."
+  (when-let* ((frame lsp-bridge-popup-documentation-frame)
+              ((frame-live-p frame))
+              (window (frame-root-window frame)))
+    (with-current-buffer (window-buffer window)
+      (setq-local cursor-type nil
+                  cursor-in-non-selected-windows nil
+                  word-wrap t
+                  ;; The padding fringes stay blank where lines wrap.
+                  fringe-indicator-alist '((continuation nil nil))))
+    (set-window-point window 1)
+    (set-window-start window 1)))
+(advice-add 'lsp-bridge-popup-documentation--callback :after #'my/lsp-hover-from-top)
+
 ;; Keep local language-server settings outside the vendored lsp-bridge tree.
 (setq lsp-bridge-user-langserver-dir
       (expand-file-name "langserver" (file-name-directory

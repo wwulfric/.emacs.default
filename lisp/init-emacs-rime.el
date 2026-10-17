@@ -13,11 +13,15 @@
 (setq default-input-method "rime"
      rime-show-candidate 'posframe )
 
-;; White with a hairline (the `child-frame-border' face), like the other
-;; popups; fringes and line spacing pad the candidates instead of a border.
+(defvar my/palette-padding)
+(defvar my/palette-line-spacing)
+
+;; White with a hairline (the `child-frame-border' face), padded and spaced
+;; like the minibuffer panel (init-palette.el) and the completion menu.
 (setq rime-posframe-properties
-      '(:border-width 1 :left-fringe 10 :right-fringe 10
-        :override-parameters ((line-spacing . (0.35 . 0.35)))))
+      `(:border-width 1 :left-fringe ,my/palette-padding
+        :right-fringe ,my/palette-padding
+        :override-parameters ((line-spacing . ,my/palette-line-spacing))))
 (setq rime-user-data-dir (concat (global/load-file-path) "../rime" ))
 
 (setq rime-disable-predicates

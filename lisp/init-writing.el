@@ -1182,8 +1182,15 @@ That mode uses generic code faces rather than `markdown-header-face-N'."
     (treesit-font-lock-recompute-features)
     (font-lock-flush)))
 
+(defun my/writing-maybe-typography ()
+  "Use prose typography, except in hidden buffers such as popup documentation.
+Language-server popups render Markdown in buffers whose names start with a
+space; they keep the code font of the other popups."
+  (unless (string-prefix-p " " (buffer-name))
+    (my/writing-typography-mode 1)))
+
 (dolist (hook '(org-mode-hook markdown-mode-hook markdown-ts-mode-hook))
-  (add-hook hook #'my/writing-typography-mode))
+  (add-hook hook #'my/writing-maybe-typography))
 (add-hook 'markdown-ts-mode-hook #'my/writing-markdown-ts-faces)
 
 (provide 'init-writing)

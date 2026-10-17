@@ -130,6 +130,26 @@ shows it below the list.  Other pickers put it in the
                                          (my/completion--buffer-directory target))))
                      (abbreviate-file-name file)))))))
 
+(defconst my/completion-annotation-height 0.85
+  "Height of detailed annotations relative to the candidates.")
+
+(defun my/completion--quiet-annotation (suffix)
+  "Return the Marginalia annotation SUFFIX smaller, aligned right by pixels.
+Marginalia aligns by columns, which a smaller or proportional font
+breaks."
+  (if-let* (((> (length suffix) 0))
+            (align (text-property-any 0 (length suffix) 'marginalia--align t suffix)))
+      (let ((suffix (copy-sequence suffix)))
+        (add-face-text-property 0 (length suffix)
+                                `(:height ,my/completion-annotation-height) t suffix)
+        (let ((width (string-pixel-width (substring suffix (1+ align))
+                                         (current-buffer))))
+          (put-text-property align (1+ align) 'display
+                             `(space :align-to (- right (,width)))
+                             suffix))
+        suffix)
+    suffix))
+
 (defun my/completion-format-file (format candidate &rest args)
   "Call FORMAT with CANDIDATE and ARGS, showing names before directories.
 Buffers of files or directories follow their name with the directory too.
@@ -146,7 +166,8 @@ interface font (init-palette.el)."
       ((or 'consult-grep 'consult-xref)
        (setq candidate (copy-sequence candidate))
        (add-face-text-property 0 (length candidate) 'fixed-pitch t candidate))))
-  (apply format candidate args))
+  (pcase-let ((`(,prefix ,suffix . ,rest) args))
+    (apply format candidate prefix (my/completion--quiet-annotation suffix) rest)))
 (advice-add 'vertico--format-candidate :around #'my/completion-format-file)
 
 ;;;; Matching
@@ -177,9 +198,35 @@ interface font (init-palette.el)."
 
 ;;;; Annotations
 
-;; Commands show only their keys, like a command palette; files show none;
-;; buffers only whether they are modified, as their icon tells the type and
-;; their directory follows the name.  M-A cycles to the detailed annotations.
+;; Commands show only their keys, like a command palette, and the panel's
+;; footer their documentation; files show none; buffers only whether they
+;; are modified, as their icon tells the type and their directory follows
+;; the name.  M-A cycles files, buffers and structure to detailed
+;; annotations, smaller than the names they describe.
+(defface my/completion-key '((t (:inherit (fixed-pitch shadow))))
+  "Keys of a command's binding, as JetBrains shows shortcuts in its lists."
+  :group 'faces)
+
+(defconst my/completion-key-gap 5
+  "Pixels between the keys of a binding.")
+
+(defun my/completion-keys (key)
+  "Return the key sequence KEY with a little space between its keys."
+  (mapconcat (lambda (label) (propertize label 'face 'my/completion-key))
+             (split-string (key-description key) " ")
+             (propertize " " 'display `(space :width (,my/completion-key-gap)))))
+
+(defun my/completion-annotate-binding (cand)
+  "Annotate command CAND with its keys at the right edge.
+The list may use a proportional font, so the keys align by pixels."
+  (when-let* ((symbol (intern-soft cand))
+              (key (and (commandp symbol)
+                        (where-is-internal symbol nil 'first-only))))
+    (let ((keys (my/completion-keys key)))
+      (concat (propertize " " 'display
+                          `(space :align-to (- right (,(string-pixel-width keys)))))
+              keys))))
+
 (defun my/completion-annotate-buffer (cand)
   "Annotate buffer CAND with a dot if its file is modified."
   (when-let* ((buffer (get-buffer cand))
@@ -187,17 +234,35 @@ interface font (init-palette.el)."
               ((buffer-modified-p buffer)))
     (marginalia--fields ("●" :face 'marginalia-modified))))
 
+(defun my/completion-annotate-detail (cand)
+  "Annotate CAND of a mixed list, such as `consult-buffer', in detail.
+Buffers and files get the detailed annotations of their own lists."
+  (pcase-let ((`(,category . ,target) (get-text-property 0 'multi-category cand)))
+    (pcase category
+      ('buffer (marginalia-annotate-buffer target))
+      ('file (marginalia-annotate-file target)))))
+
+;; Each list has two states, short and detailed: Emacs's own annotations
+;; would add a third that runs off the panel.
 (setq marginalia-align 'right
       marginalia-field-width 40)
 (setf (alist-get 'command marginalia-annotators)
-      '(marginalia-annotate-binding marginalia-annotate-command builtin none)
+      '(my/completion-annotate-binding)
       (alist-get 'buffer marginalia-annotators)
-      '(my/completion-annotate-buffer marginalia-annotate-buffer builtin none)
+      '(my/completion-annotate-buffer marginalia-annotate-buffer)
+      (alist-get 'multi-category marginalia-annotators)
+      '(marginalia-annotate-multi-category my/completion-annotate-detail)
       (alist-get 'file marginalia-annotators)
-      '(none marginalia-annotate-file builtin)
+      '(none marginalia-annotate-file)
       (alist-get 'project-file marginalia-annotators)
-      '(none marginalia-annotate-project-file builtin))
-(keymap-set minibuffer-local-map "M-A" #'marginalia-cycle)
+      '(none marginalia-annotate-project-file))
+(defun my/completion-cycle-annotations ()
+  "Show the next annotations of this list, if it has others.
+Quietly: a message would show inside the floating panel's input."
+  (interactive)
+  (let ((inhibit-message t))
+    (ignore-errors (marginalia-cycle))))
+(keymap-set minibuffer-local-map "M-A" #'my/completion-cycle-annotations)
 (marginalia-mode 1)
 
 ;;;; Search

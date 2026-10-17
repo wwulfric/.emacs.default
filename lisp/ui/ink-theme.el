@@ -160,6 +160,7 @@
    `(completions-common-part ((t (:foreground ,accent))))
    `(completions-annotations ((t (:foreground ,muted :slant normal))))
    `(marginalia-key ((t (:inherit fixed-pitch :foreground ,muted))))
+   `(my/completion-key ((t (:inherit fixed-pitch :height 0.85 :foreground ,muted))))
    ;; Occurrences in listed code lines, as an editor highlights usages: a
    ;; tint deeper than the selected row's, so it shows on that row too.
    `(xref-match ((t (:background "#D3E0F2"))))

@@ -110,9 +110,78 @@ STRING is returned unchanged when nothing needs scaling."
             (put-text-property index (1+ index) 'display `(height ,scale) copy))))
       (or copy string))))
 
+(defun my/ui-line-height (face &optional buffer)
+  "Return the pixel height of a header or mode line drawn in FACE.
+FACE may be a face name or attribute list; BUFFER's face remapping
+applies, the current buffer's by default."
+  (my/ui--row-height (propertize " " 'face face)
+                     (buffer-local-value 'face-remapping-alist
+                                         (or buffer (current-buffer)))))
+
+;;;; Rounded corners
+
+;; A child frame is an opaque rectangle on macOS: neither the native
+;; rounded window style nor a transparent background applies to it.  A
+;; panel that draws its own outline can still look rounded: images of its
+;; corners paint the cut-off part in the color the panel sits on, while
+;; everything between them stays native text.
+
+(defvar my/ui--corner-cache (make-hash-table :test #'equal)
+  "Corner strings by (CORNER RADIUS HEIGHT INSIDE OUTSIDE LINE).")
+
+(defun my/ui--svg-color (color)
+  "Return COLOR, which may be an Emacs color name, as #RRGGBB."
+  (if-let* ((values (and color (color-values color))))
+      (apply #'format "#%02x%02x%02x" (mapcar (lambda (v) (/ v 257)) values))
+    "none"))
+
+(defun my/ui-corner (corner radius height inside outside line)
+  "Return a string showing CORNER of a rounded box, RADIUS by HEIGHT pixels.
+CORNER is `top-left', `top-right', `bottom-left' or `bottom-right'.  The
+box is filled with INSIDE and outlined by a one-pixel LINE; the cut-off
+corner shows OUTSIDE, the color the box sits on.  The image fills a row
+HEIGHT pixels high and ignores the row's box, overline and underline."
+  (let ((key (list corner radius height inside outside line)))
+    (or (gethash key my/ui--corner-cache)
+        (puthash
+         key
+         (let* ((r radius) (h height) (a (- r 0.5))
+                ;; Drawn as the top-left corner, then mirrored.
+                (transform (pcase corner
+                             ('top-left "")
+                             ('top-right (format "translate(%d 0) scale(-1 1)" r))
+                             ('bottom-left (format "translate(0 %d) scale(1 -1)" h))
+                             ('bottom-right (format "translate(%d %d) scale(-1 -1)" r h))))
+                (svg (format "<svg xmlns='http://www.w3.org/2000/svg' width='%d' height='%d'>\
+<rect width='%d' height='%d' fill='%s'/>\
+<g transform='%s'>\
+<path d='M0,%d V%d A%d,%d 0 0 1 %d,0 H%d V%d Z' fill='%s'/>\
+<path d='M0.5,%d V%d A%s,%s 0 0 1 %d,0.5' fill='none' stroke='%s' stroke-width='1'/>\
+</g></svg>"
+                             r h r h (my/ui--svg-color outside) transform
+                             h r r r r r h (my/ui--svg-color inside)
+                             h r a a r (my/ui--svg-color line))))
+           (propertize " " 'face '(:box nil :overline nil :underline nil)
+                       'display (create-image svg 'svg t :ascent 'center)))
+         my/ui--corner-cache))))
+
+(defun my/ui-rounded-line (text radius height inside outside line top)
+  "Return TEXT between the two corners of a rounded header or mode line.
+TOP chooses the top corners, else the bottom ones.  RADIUS, HEIGHT,
+INSIDE, OUTSIDE and LINE are as in `my/ui-corner'."
+  (concat (my/ui-corner (if top 'top-left 'bottom-left)
+                        radius height inside outside line)
+          text
+          (propertize " " 'display
+                      `(space :align-to (- (+ right right-fringe right-margin)
+                                           (,radius))))
+          (my/ui-corner (if top 'top-right 'bottom-right)
+                        radius height inside outside line)))
+
 (defun my/ui--forget-glyph-scales (&rest _)
-  "Measure glyphs again after fonts change."
-  (clrhash my/ui--glyph-scale-cache))
+  "Measure glyphs and draw corners again after fonts or colors change."
+  (clrhash my/ui--glyph-scale-cache)
+  (clrhash my/ui--corner-cache))
 
 (add-hook 'after-setting-font-hook #'my/ui--forget-glyph-scales)
 (add-hook 'enable-theme-functions #'my/ui--forget-glyph-scales)

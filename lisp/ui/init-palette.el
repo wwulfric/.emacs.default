@@ -42,6 +42,10 @@
   "One-pixel outline of the floating minibuffer panel."
   :group 'faces)
 
+(defface my/palette-edge '((t (:foreground "gray70")))
+  "Side outline drawn in the panel's fringes; follows `my/palette-border'."
+  :group 'faces)
+
 (defface my/palette-title '((t (:inherit shadow)))
   "Title above the input of the floating minibuffer panel."
   :group 'faces)
@@ -117,7 +121,8 @@ Expressions keep ElDoc beside them; live filters keep their page in view.")
 (defconst my/palette-padding (* 3 my/ui-space-small)
   "Horizontal padding inside the panel, in pixels.")
 
-(defconst my/palette-border-width 1)
+(defvar my/palette-radius 8
+  "Radius of the panel's rounded corners, in pixels.")
 
 (defvar my/palette-edge-height 80
   "Height in 1/10 pt of the empty mode line padding the panel's bottom.
@@ -184,6 +189,15 @@ the input and the candidates' names start at `my/palette-indent'.")
 (defvar-local my/palette--prefix nil
   "Overlay showing the prefix of the input, or nil.")
 
+(defvar-local my/palette--outside nil
+  "Color under the panel, shown in its cut-off corners.")
+
+(defvar-local my/palette--edge-face nil
+  "Face of the empty mode line padding the bottom of a panel without a list.")
+
+(defvar-local my/palette--line-heights nil
+  "Alist of a header or mode line face and its height in pixels.")
+
 (defvar-local my/palette--title nil
   "Title of this minibuffer, or nil when it shows its prompt.")
 
@@ -223,8 +237,7 @@ window."
                (width (plist-get info :posframe-width))
                (height (plist-get info :posframe-height))
                (below (+ y line)))
-    (cons (max 0 (min (- x my/palette-border-width my/palette-padding
-                         my/palette-indent)
+    (cons (max 0 (min (- x my/palette-padding my/palette-indent)
                       (- (plist-get info :parent-frame-width) width)))
           (max 0 (if (> (+ below height) (plist-get info :parent-frame-height))
                      (- y height)
@@ -264,8 +277,9 @@ window."
                :window-point input
                :left-fringe my/palette-padding
                :right-fringe my/palette-padding
-               :border-width my/palette-border-width
-               :border-color (face-background 'my/palette-border nil t)
+               ;; The panel draws its own rounded outline (see
+               ;; `my/palette--rounded'); a frame border has square corners.
+               :border-width 0
                :background-color (face-background 'my/palette nil t)
                :foreground-color (face-foreground 'my/palette nil t)
                ;; Its header and mode lines pad the panel (see the setup).
@@ -277,10 +291,17 @@ window."
     (when anchor
       (when (zerop my/palette--width)
         (setq my/palette--width (frame-width frame))))
-    ;; Fringes are the horizontal padding: paint them like the panel.
-    (let ((color (face-background 'my/palette nil t)))
+    ;; Fringes are the horizontal padding: paint them like the panel, with
+    ;; the side outline at their outer edge.
+    (let ((color (face-background 'my/palette nil t))
+          (line (face-background 'my/palette-border nil t)))
       (unless (equal (face-background 'fringe frame t) color)
-        (set-face-background 'fringe color frame)))))
+        (set-face-background 'fringe color frame))
+      (unless (equal (face-foreground 'my/palette-edge frame t) line)
+        (set-face-foreground 'my/palette-edge line frame)))
+    ;; The cut-off corners show what the panel sits on.
+    (setq my/palette--outside
+          (face-background 'default (window-frame origin) t))))
 
 (defun my/palette--display ()
   "Show this minibuffer in its panel and hide the echo-area copy."
@@ -347,6 +368,33 @@ window."
                                  'face 'my/palette-title)))
             (when count
               (my/palette--at-right (propertize count 'face 'shadow))))))
+
+(define-fringe-bitmap 'my/palette-edge-left
+  (vector (ash 1 (1- my/palette-padding))) 1 my/palette-padding '(top periodic))
+(define-fringe-bitmap 'my/palette-edge-right [1] 1 my/palette-padding '(top periodic))
+
+(defconst my/palette--edges
+  (concat (propertize " " 'display '(left-fringe my/palette-edge-left my/palette-edge))
+          (propertize " " 'display '(right-fringe my/palette-edge-right my/palette-edge)))
+  "Text that draws the side outline in the fringes of its row.")
+
+(defun my/palette--line-height (face)
+  "Return the height of a header or mode line in FACE, measured once."
+  (or (alist-get face my/palette--line-heights nil nil #'eq)
+      (setf (alist-get face my/palette--line-heights nil nil #'eq)
+            (my/ui-line-height face))))
+
+(defun my/palette--rounded (text top)
+  "Return TEXT as the panel's TOP line, or else its bottom one.
+Its corners are rounded and carry the outline's sides around them."
+  (let ((face (cond (top my/palette--line-face)
+                    (my/palette--list my/palette--footer-face)
+                    (t my/palette--edge-face))))
+    (if (not (and my/palette--outside (display-graphic-p)))
+        text
+      (my/ui-rounded-line text my/palette-radius (my/palette--line-height face)
+                          (plist-get face :background) my/palette--outside
+                          (face-background 'my/palette-border nil t) top))))
 
 (defun my/palette--remap (line spec)
   "Draw LINE, `header-line' or `mode-line', with face attributes SPEC.
@@ -488,13 +536,15 @@ it in the minibuffer."
                                          :height ,my/palette-input-height)))))))
 
 (defun my/palette--divider-args (args)
-  "Put a line before the candidate lines in ARGS when they show in a panel."
+  "Put a line before the candidate lines in ARGS when they show in a panel.
+Every line draws the panel's side outline in the fringes."
   (pcase-let ((`(,lines) args))
     (if (and my/palette--placement lines)
-        (list (cons (concat (propertize " " 'face 'my/palette-divider
-                                        'display '(space :align-to right))
-                            (propertize "\n" 'face 'my/palette-divider))
-                    lines))
+        (list (mapcar (lambda (line) (concat my/palette--edges line))
+                      (cons (concat (propertize " " 'face 'my/palette-divider
+                                                'display '(space :align-to right))
+                                    (propertize "\n" 'face 'my/palette-divider))
+                            lines)))
       args)))
 
 (defun my/palette--format-candidate (format cand prefix &rest args)
@@ -555,26 +605,32 @@ to the row, which the panel's height counts on."
                 auto-hscroll-mode 'current-line
                 ;; The header line holds the title, the mode line the footer
                 ;; of a list or else padding.
-                header-line-format '(:eval (my/palette--header))
-                mode-line-format '(:eval (my/palette--footer)))
+                header-line-format '(:eval (my/palette--rounded (my/palette--header) t))
+                mode-line-format '(:eval (my/palette--rounded (my/palette--footer) nil)))
     (let* ((background (face-background 'my/palette nil t))
-           (plain `(:box nil :overline nil :underline nil :inherit my/ui-font
-                         :background ,background))
-           (edge `(:height ,my/palette-edge-height ,@plain)))
+           (border (face-background 'my/palette-border nil t))
+           ;; The outline's top runs along the header line, its bottom along
+           ;; the mode line; an underline that low lands on the last pixel.
+           (top `(:overline ,border :underline nil))
+           (bottom `(:overline nil :underline (:color ,border :position 100)))
+           (plain `(:box nil :inherit my/ui-font :background ,background))
+           (edge `(:height ,my/palette-edge-height ,@bottom ,@plain)))
       (setq my/palette--status nil
             my/palette--tabs nil
             my/palette--icon nil
             my/palette--input-start nil
             my/palette--prefix nil
             my/palette--action (alist-get this-command my/palette-actions)
+            my/palette--edge-face edge
+            my/palette--line-heights nil
             my/palette--line-face
-            `(:height ,my/palette-header-height
+            `(:height ,my/palette-header-height ,@top
                       ,@plain :box (:line-width (0 . ,my/palette-header-padding)
                                                 :color ,background))
             my/palette--footer-face
             (let ((band (face-background 'my/palette-footer nil t)))
-              `(:height ,my/palette-header-height
-                        :overline nil :underline nil :inherit my/ui-font :background ,band
+              `(:height ,my/palette-header-height ,@bottom
+                        :inherit my/ui-font :background ,band
                         :box (:line-width (0 . ,my/palette-header-padding)
                                           :color ,band))))
       (my/palette--remap 'header-line my/palette--line-face)
@@ -583,6 +639,7 @@ to the row, which the panel's height counts on."
     ;; Interface text in the interface font; pickers keep code in the code
     ;; font (init-completion.el).
     (face-remap-add-relative 'default 'my/ui-font)
+    (overlay-put (make-overlay (point-min) (point-min)) 'before-string my/palette--edges)
     (let ((start (minibuffer-prompt-end)))
       (when my/palette--title
         (my/palette--replace-prompt my/palette--list))

@@ -386,6 +386,16 @@ reading margins remain independent."
 (dolist (frame (frame-list))
   (my/frame-apply-window-padding frame))
 
+;; Popups (posframe, lsp-bridge) refuse focus.  A click on one would still
+;; select it, sending the following keys to a frame that soon hides.
+(defun my/frame-keep-popups-unselected (handle event)
+  "Call HANDLE with switch-frame EVENT unless it targets a popup frame."
+  (let ((frame (cadr event)))
+    (unless (and (framep frame) (frame-parent frame)
+                 (frame-parameter frame 'no-accept-focus))
+      (funcall handle event))))
+(advice-add 'handle-switch-frame :around #'my/frame-keep-popups-unselected)
+
 (defun my/frame-apply-echo-area-padding (frame)
   "Pad the echo area of GUI FRAME like editor text.
 Otherwise its text starts at the frame edge, under the rounded corner."

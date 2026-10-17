@@ -697,6 +697,23 @@ syntax properties and structural caches may be refreshed."
   :type 'integer :group 'my-writing)
 (defface my-writing-heading-marker '((t (:inherit (fixed-pitch shadow))))
   "Prose source markers and optional section numbers." :group 'my-writing)
+(defcustom my/writing-justify t
+  "Whether the reading layout justifies paragraphs with EKP.
+EKP breaks each paragraph at its best points, as TeX does, keeping Chinese
+punctuation off line starts and ends.  It changes only display."
+  :type 'boolean :group 'my-writing)
+
+(autoload 'ekp-auto-justify-mode "ekp" nil t)
+(defvar ekp-auto-justify-mode)
+(defvar ekp-buffer-mode-policy-alist)
+
+;; The bundled `markdown-ts-mode' does not derive from `markdown-mode', and
+;; its code takes our faces (see `my/writing-markdown-ts-faces').
+(with-eval-after-load 'ekp
+  (add-to-list 'ekp-buffer-mode-policy-alist
+               '(markdown-ts-mode
+                 (ekp-buffer-skip-faces my-writing-code-block fixed-pitch)
+                 (ekp-buffer-inline-faces my-writing-inline-code))))
 
 (defvar-local my/writing--saved-state nil)
 (defvar-local my/writing--typography-state nil)
@@ -954,7 +971,8 @@ see `my/writing-typography-mode'."
                     (my/writing--save-variables
                      '(org-hide-leading-stars
                        org-adapt-indentation indent-tabs-mode))
-                    :org-indent (bound-and-true-p org-indent-mode)))
+                    :org-indent (bound-and-true-p org-indent-mode)
+                    :justify nil))
         (when (bound-and-true-p org-indent-mode)
           (org-indent-mode -1)
           (my/writing--restore-variables
@@ -970,7 +988,12 @@ see `my/writing-typography-mode'."
         (add-hook 'window-scroll-functions #'my/writing--refresh-buffer-windows nil t)
         (add-hook 'change-major-mode-hook #'my/writing--leave-layout nil t)
         (add-hook 'kill-buffer-hook #'my/writing--release-buffer-windows nil t)
-        (my/writing--refresh-buffer-windows))
+        (my/writing--refresh-buffer-windows)
+        ;; After the margins, so EKP measures the reading width.
+        (when (and my/writing-justify (not (bound-and-true-p ekp-auto-justify-mode))
+                   (locate-library "ekp"))
+          (ekp-auto-justify-mode 1)
+          (setf (plist-get my/writing--saved-state :justify) t)))
     (when my/writing--saved-state
       (remove-hook 'post-command-hook #'my/writing--refresh-buffer-windows t)
       (remove-hook 'after-change-functions #'my/writing--refresh-buffer-windows t)
@@ -978,6 +1001,9 @@ see `my/writing-typography-mode'."
       (remove-hook 'change-major-mode-hook #'my/writing--leave-layout t)
       (remove-hook 'kill-buffer-hook #'my/writing--release-buffer-windows t)
       (my/writing--release-buffer-windows)
+      (when (and (plist-get my/writing--saved-state :justify)
+                 (bound-and-true-p ekp-auto-justify-mode))
+        (ekp-auto-justify-mode -1))
       (when (plist-get my/writing--saved-state :org-indent) (org-indent-mode 1))
       (my/writing--restore-variables (plist-get my/writing--saved-state :variables))
       (setq my/writing--saved-state nil)

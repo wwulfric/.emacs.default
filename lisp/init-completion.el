@@ -18,6 +18,7 @@
 (require 'consult-xref)
 (require 'consult-imenu)
 (require 'expui-icons)
+(require 'ui-layout)
 
 ;;;; Vertico
 
@@ -142,11 +143,11 @@ breaks."
       (let ((suffix (copy-sequence suffix)))
         (add-face-text-property 0 (length suffix)
                                 `(:height ,my/completion-annotation-height) t suffix)
-        (let ((width (string-pixel-width (substring suffix (1+ align))
-                                         (current-buffer))))
-          (put-text-property align (1+ align) 'display
-                             `(space :align-to (- right (,width)))
-                             suffix))
+        (put-text-property align (1+ align) 'display
+                           (get-text-property
+                            0 'display (my/ui-right-space (substring suffix (1+ align))
+                                                          nil (current-buffer)))
+                           suffix)
         suffix)
     suffix))
 
@@ -223,9 +224,7 @@ The list may use a proportional font, so the keys align by pixels."
               (key (and (commandp symbol)
                         (where-is-internal symbol nil 'first-only))))
     (let ((keys (my/completion-keys key)))
-      (concat (propertize " " 'display
-                          `(space :align-to (- right (,(string-pixel-width keys)))))
-              keys))))
+      (my/ui-at-right keys))))
 
 (defun my/completion-annotate-buffer (cand)
   "Annotate buffer CAND with a dot if its file is modified."

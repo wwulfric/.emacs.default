@@ -10,6 +10,7 @@
 (require 'dirvish)
 (require 'dirvish-side)
 (require 'expui-icons)
+(require 'ui-layout)
 
 ;; Dirvish sorts with GNU ls options such as --sort, and only GNU ls lists
 ;; folders first.  macOS ships BSD ls, so use coreutils' gls when it is
@@ -236,11 +237,7 @@ As in a New UI tool window, the toolbar shows when focused or hovered."
              (truncate-string-pixelwise name room (current-buffer) "…")
              chevron)
             (when toolbar
-              (concat (propertize
-                       " " 'display
-                       `(space :align-to (- (+ right right-fringe right-margin)
-                                            (,toolbar-width))))
-                      toolbar)))))
+              (my/ui-at-right toolbar '(+ right right-fringe right-margin))))))
 
 (defun my/dirvish-side-in-editor (function &rest args)
   "Call FUNCTION with ARGS, or interactively, from the last editor window.

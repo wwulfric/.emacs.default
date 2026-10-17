@@ -135,6 +135,7 @@ Otherwise call ORIGINAL with FILENAME, FILEHOST and POSITION to jump."
 ;; project-wide searches use the palette at the top of the frame.
 
 (require 'xref)
+(require 'ui-layout)
 (require 'consult-xref)
 (defvar my/palette-placement)
 (declare-function my/palette-set-status "init-palette" (status))
@@ -404,10 +405,8 @@ bottom line spells out the kind and the full place of the selected one."
     (pcase-dolist (`(,_ ,kind ,place ,target ,icon ,full) rows)
       (let ((candidate
              (concat (pop names)
-                     (propertize " " 'display `(space :align-to (,column)))
-                     (propertize (if (> (string-width place) place-width)
-                                     (concat "…" (substring place (- 1 place-width)))
-                                   place)
+                     (my/ui-space-to column)
+                     (propertize (my/ui-fit-left place place-width)
                                  'face 'completions-annotations))))
         (add-text-properties 0 1 `(my/completion-icon ,icon
                                    my/completion-detail

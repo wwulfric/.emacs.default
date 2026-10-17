@@ -29,6 +29,7 @@
 (require 'posframe)
 (require 'expui-icons)
 (require 'thingatpt)
+(require 'ui-layout)
 
 (defvar vertico-count)
 (defvar consult-after-jump-hook)
@@ -339,7 +340,7 @@ window."
 (defun my/palette--header ()
   "Return the title line: the title or tabs at the left, the count at the right."
   (let ((count (my/palette--count)))
-    (concat (my/palette--space-to my/palette-icon-indent)
+    (concat (my/ui-space-to my/palette-icon-indent)
             (or my/palette--tabs
                 (and my/palette--title
                      (propertize (my/palette--literal my/palette--title)
@@ -361,19 +362,12 @@ The minibuffer window has neither line, so only the panel shows them."
   "Return TEXT for the header or footer, which read % as a format directive."
   (string-replace "%" "%%" text))
 
-(defun my/palette--fit (text width)
-  "Return TEXT shortened from the left to WIDTH columns, keeping its end."
-  (if (> (string-width text) width)
-      (concat "…" (substring text (- 1 (max 1 width))))
-    text))
-
 (defun my/palette--at-right (text)
   "Return TEXT, in the title and footer size, aligned to the right edge."
-  (let ((width (string-pixel-width
-                (propertize text 'face `(:inherit my/ui-font
-                                         :height ,my/palette-header-height)))))
-    (concat (propertize " " 'display `(space :align-to (- right (,width))))
-            text)))
+  (concat (my/ui-right-space
+           (propertize text 'face `(:inherit my/ui-font
+                                    :height ,my/palette-header-height)))
+          text))
 
 (defun my/palette--detail (width)
   "Return the full location or description of the selected candidate.
@@ -381,7 +375,7 @@ It is shortened from the left to WIDTH columns."
   (when-let* (((fboundp 'my/completion-detail))
               ((>= vertico--index 0))
               (detail (my/completion-detail (vertico--candidate))))
-    (propertize (my/palette--literal (my/palette--fit detail width))
+    (propertize (my/palette--literal (my/ui-fit-left detail width))
                 'face 'shadow)))
 
 (defun my/palette--footer ()
@@ -399,9 +393,9 @@ padding the panel."
                                          'face 'shadow))))
            (room (- (+ 2 (or (my/palette-text-width) 80))
                     (if action (+ 3 (string-width action)) 0))))
-      (concat (my/palette--space-to my/palette-icon-indent)
+      (concat (my/ui-space-to my/palette-icon-indent)
               (if my/palette--status
-                  (my/palette--literal (my/palette--fit my/palette--status room))
+                  (my/palette--literal (my/ui-fit-left my/palette--status room))
                 (my/palette--detail room))
               (and action (my/palette--at-right action))))))
 
@@ -455,7 +449,7 @@ input lines up with candidates, or with the input of other panels."
       (let ((icon (make-overlay (point-min) (1- end))))
         (overlay-put icon 'display (if search (my/palette--search-icon) ""))
         (overlay-put icon 'face 'shadow)
-        (overlay-put icon 'before-string (my/palette--space-to my/palette-icon-indent))
+        (overlay-put icon 'before-string (my/ui-space-to my/palette-icon-indent))
         (setq my/palette--icon icon)))
     (when (> end (point-min))
       ;; A display string would ignore an alignment inside it.
@@ -493,10 +487,6 @@ it in the minibuffer."
                                  'face `(:inherit shadow :weight normal
                                          :height ,my/palette-input-height)))))))
 
-(defun my/palette--space-to (x)
-  "Return a space reaching X pixels from the start of the text area."
-  (propertize " " 'display `(space :align-to (,x))))
-
 (defun my/palette--divider-args (args)
   "Put a line before the candidate lines in ARGS when they show in a panel."
   (pcase-let ((`(,lines) args))
@@ -507,17 +497,14 @@ it in the minibuffer."
                     lines))
       args)))
 
-(defun my/palette--space (width)
-  "Return a space WIDTH pixels wide."
-  (propertize " " 'display `(space :width (,(max 0 width)))))
-
 (defun my/palette--format-candidate (format cand prefix &rest args)
   "Call FORMAT with CAND, PREFIX and ARGS, indenting panel candidates.
 The indentation holds a bar for the selected candidate, then the icon of a
 file or buffer below the search icon, so that names line up with the input.
 Vertico puts a space before every alignment in a candidate, so the
-indentation is made of exact widths instead."
-  (apply format cand
+indentation is made of exact widths instead.  Emoji and symbols are scaled
+to the row, which the panel's height counts on."
+  (apply format (if my/palette--placement (my/ui-fit-tall-glyphs cand) cand)
          (if my/palette--placement
              (let* ((icon (and (fboundp 'my/completion-icon)
                                (my/completion-icon cand)))
@@ -526,16 +513,16 @@ indentation is made of exact widths instead."
                                                           t))
                                   0))
                     (mark (when (= (nth 1 args) vertico--index)
-                            (propertize (my/palette--space my/palette-mark-width)
+                            (propertize (my/ui-space my/palette-mark-width)
                                         'face 'my/palette-mark)))
                     (used (if mark my/palette-mark-width 0)))
                (concat mark
                        (when icon
-                         (prog1 (concat (my/palette--space
+                         (prog1 (concat (my/ui-space
                                          (- my/palette-icon-indent used))
                                         icon)
                            (setq used (+ my/palette-icon-indent icon-width))))
-                       (my/palette--space (- my/palette-indent used))
+                       (my/ui-space (- my/palette-indent used))
                        prefix))
            prefix)
          args))
@@ -543,7 +530,7 @@ indentation is made of exact widths instead."
 (defun my/palette--format-group-title (title)
   "Indent group TITLE in a panel like the panel title, outside its items."
   (if my/palette--placement
-      (concat (my/palette--space-to my/palette-icon-indent)
+      (concat (my/ui-space-to my/palette-icon-indent)
               title)
     title))
 

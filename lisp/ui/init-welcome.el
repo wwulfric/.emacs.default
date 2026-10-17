@@ -11,6 +11,7 @@
 (require 'recentf)
 (require 'subr-x)
 (require 'init-workspace)
+(require 'ui-layout)
 
 (defgroup my/welcome nil "Project start page." :group 'convenience)
 
@@ -75,11 +76,7 @@ Chinese text uses a taller fallback font; a common strut keeps rows even.")
 
 (defun my/welcome-fit-left (string width)
   "Like `my/welcome-fit' but keep the end of STRING, as for paths."
-  (let ((columns (string-width string)))
-    (my/welcome-fit (if (<= columns width) string
-                      (concat "…" (truncate-string-to-width
-                                   string columns (- columns (1- width)))))
-                    width)))
+  (my/welcome-fit (my/ui-fit-left (or string "") width) width))
 
 (defun my/welcome-display-path (path)
   "Return PATH abbreviated, without a trailing slash."
@@ -124,10 +121,7 @@ Chinese text uses a taller fallback font; a common strut keeps rows even.")
                      'face 'my/welcome-meta)
        "")
      ;; Right-align by pixels so the time ends at the rule's right edge.
-     (propertize " " 'display
-                 `(space :align-to (- ,(+ my/welcome-indent content)
-                                      (,(string-pixel-width info)))))
-     info)))
+     (my/ui-at-right info (+ my/welcome-indent content)))))
 
 (defun my/welcome-recent-files (roots)
   "Return recent local files outside every project in ROOTS."
@@ -199,10 +193,7 @@ and CJK glyphs that a column count gets wrong."
   "Return a heading with LEFT and RIGHT text spread over CONTENT columns."
   (let ((right (propertize right 'face 'shadow)))
     (concat (propertize left 'face 'my/welcome-heading)
-            (propertize " " 'display
-                        `(space :align-to (- ,(+ my/welcome-indent content)
-                                             (,(string-pixel-width right)))))
-            right)))
+            (my/ui-at-right right (+ my/welcome-indent content)))))
 
 (defun my/welcome-hints (pairs)
   "Format PAIRS of key and description as a hint line."

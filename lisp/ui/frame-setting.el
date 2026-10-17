@@ -30,6 +30,7 @@ use it; code, keys and line numbers there stay in the code font."
   (my/frame-apply-spacing frame))
 
 (require 'init-typography)
+(require 'ui-layout)
 
 ;; Restore the native title bar and macOS traffic-light buttons on reload.
 (when (eq system-type 'darwin)
@@ -331,11 +332,10 @@ package-owned local mode lines by changing only the default format."
                  'help-echo "Left or right click: mode actions, enabled minor modes and key bindings\nMiddle click: help for all modes")
      " " (string-replace "%" "%%" left)
      (when (not (string-empty-p right))
-       (propertize " " 'display
-                   (if (display-graphic-p)
-                       `(space :align-to (- (+ right right-fringe right-margin)
-                                            (,my/ui-status-padding)
-                                            (,(string-pixel-width right))))
+       (if (display-graphic-p)
+           (my/ui-right-space right `(- (+ right right-fringe right-margin)
+                                        (,my/ui-status-padding)))
+         (propertize " " 'display
                      `(space :align-to (- right ,(1+ (string-width right)))))))
      (string-replace "%" "%%" right)
      (propertize " " 'display

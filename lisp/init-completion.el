@@ -132,7 +132,9 @@ shows it below the list.  Other pickers put it in the
 
 (defun my/completion-format-file (format candidate &rest args)
   "Call FORMAT with CANDIDATE and ARGS, showing names before directories.
-Buffers of files or directories follow their name with the directory too."
+Buffers of files or directories follow their name with the directory too.
+Matched lines of code stay in the code font where the list uses the
+interface font (init-palette.el)."
   (pcase-let ((`(,category . ,target) (my/completion--category candidate)))
     (pcase category
       ((or 'file 'project-file)
@@ -140,7 +142,10 @@ Buffers of files or directories follow their name with the directory too."
       ('buffer
        (when-let* ((directory (my/completion--buffer-directory target)))
          (setq candidate (my/completion--after-name
-                          candidate (abbreviate-file-name directory)))))))
+                          candidate (abbreviate-file-name directory)))))
+      ((or 'consult-grep 'consult-xref)
+       (setq candidate (copy-sequence candidate))
+       (add-face-text-property 0 (length candidate) 'fixed-pitch t candidate))))
   (apply format candidate args))
 (advice-add 'vertico--format-candidate :around #'my/completion-format-file)
 

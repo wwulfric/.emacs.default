@@ -91,7 +91,7 @@ directory rows taller and renders wider than Emacs measures."
               #'my/dirvish-align-subtree-state))
 
 (defface my/dirvish-file-name
-  '((t (:family "Helvetica Neue" :height 0.95 :weight normal)))
+  '((t (:inherit my/ui-font :height 0.95)))
   "Proportional sidebar text." :group 'dirvish)
 (defface my/dirvish-project-title '((t (:inherit default)))
   "Sidebar project title." :group 'dirvish)

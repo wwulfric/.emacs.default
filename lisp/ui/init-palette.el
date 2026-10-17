@@ -370,7 +370,8 @@ The minibuffer window has neither line, so only the panel shows them."
 (defun my/palette--at-right (text)
   "Return TEXT, in the title and footer size, aligned to the right edge."
   (let ((width (string-pixel-width
-                (propertize text 'face `(:height ,my/palette-header-height)))))
+                (propertize text 'face `(:inherit my/ui-font
+                                         :height ,my/palette-header-height)))))
     (concat (propertize " " 'display `(space :align-to (- right (,width))))
             text)))
 
@@ -570,7 +571,7 @@ indentation is made of exact widths instead."
                 header-line-format '(:eval (my/palette--header))
                 mode-line-format '(:eval (my/palette--footer)))
     (let* ((background (face-background 'my/palette nil t))
-           (plain `(:box nil :overline nil :underline nil :inherit nil
+           (plain `(:box nil :overline nil :underline nil :inherit my/ui-font
                          :background ,background))
            (edge `(:height ,my/palette-edge-height ,@plain)))
       (setq my/palette--status nil
@@ -586,12 +587,15 @@ indentation is made of exact widths instead."
             my/palette--footer-face
             (let ((band (face-background 'my/palette-footer nil t)))
               `(:height ,my/palette-header-height
-                        :overline nil :underline nil :inherit nil :background ,band
+                        :overline nil :underline nil :inherit my/ui-font :background ,band
                         :box (:line-width (0 . ,my/palette-header-padding)
                                           :color ,band))))
       (my/palette--remap 'header-line my/palette--line-face)
       (my/palette--remap 'mode-line (if my/palette--list my/palette--footer-face
                                       edge)))
+    ;; Interface text in the interface font; pickers keep code in the code
+    ;; font (init-completion.el).
+    (face-remap-add-relative 'default 'my/ui-font)
     (let ((start (minibuffer-prompt-end)))
       (when my/palette--title
         (my/palette--replace-prompt my/palette--list))

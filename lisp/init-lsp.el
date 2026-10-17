@@ -343,7 +343,16 @@ ORIGINAL displays CONTENT, COUNTER and POSITION in lsp-bridge's buffer."
 (add-to-list 'completion-category-overrides '(lsp-symbol (styles my/passthrough)))
 
 (defconst my/lsp-symbol-name-width 40
-  "Widest name column; longer names are cut short.")
+  "Widest name column in characters; longer names are cut short.")
+
+(defconst my/lsp-symbol-column-gap 16
+  "Pixels between the name and place columns.")
+
+(defvar my/palette-indent)
+
+(defun my/lsp-symbol--width (name)
+  "Return the width of NAME in pixels, in the panel's interface font."
+  (string-pixel-width (propertize name 'face 'my/ui-font)))
 
 (defun my/lsp-symbol--update (infos)
   "Show the symbols INFOS in the running search.
@@ -376,6 +385,14 @@ bottom line spells out the kind and the full place of the selected one."
          (name-width (min my/lsp-symbol-name-width
                           (apply #'max 0 (mapcar (lambda (row) (string-width (nth 0 row)))
                                                  rows))))
+         (names (mapcar (lambda (row)
+                          (truncate-string-to-width (nth 0 row) name-width nil nil "…"))
+                        rows))
+         ;; The interface font is proportional: align the places by pixels,
+         ;; after the panel's indentation.
+         (column (+ (if (boundp 'my/palette-indent) my/palette-indent 0)
+                    (apply #'max 0 (mapcar #'my/lsp-symbol--width names))
+                    my/lsp-symbol-column-gap))
          ;; Places keep their end, the file and line, within the panel.
          (place-width (max 12 (- (or (and (buffer-live-p my/lsp-symbol--session)
                                           (fboundp 'my/palette-text-width)
@@ -384,9 +401,10 @@ bottom line spells out the kind and the full place of the selected one."
                                      100)
                                  name-width 3)))
          (candidates nil))
-    (pcase-dolist (`(,name ,kind ,place ,target ,icon ,full) rows)
+    (pcase-dolist (`(,_ ,kind ,place ,target ,icon ,full) rows)
       (let ((candidate
-             (concat (truncate-string-to-width name name-width nil ?\s "…") "  "
+             (concat (pop names)
+                     (propertize " " 'display `(space :align-to (,column)))
                      (propertize (if (> (string-width place) place-width)
                                      (concat "…" (substring place (- 1 place-width)))
                                    place)

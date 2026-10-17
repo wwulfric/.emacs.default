@@ -145,6 +145,10 @@
    `(my/palette-title ((t (:foreground ,structure))))
    `(my/palette-divider ((t (:strike-through ,section-rule :height 0.5))))
    `(my/palette-mark ((t (:background ,accent))))
+   `(my/palette-footer ((t (:background ,surface))))
+   `(my/palette-tab ((t (:foreground ,muted))))
+   `(my/palette-tab-active ((t (:foreground ,accent
+                                :underline (:color ,accent :position 5)))))
    `(minibuffer-nonselected ((t (:foreground ,muted))))
    `(vertico-current ((t (:foreground ,accent :background ,selection :extend t))))
    `(vertico-group-title ((t (:foreground ,muted :slant normal :height 0.85))))

@@ -137,7 +137,8 @@ Otherwise call ORIGINAL with FILENAME, FILEHOST and POSITION to jump."
 (require 'xref)
 (require 'consult-xref)
 (defvar my/palette-placement)
-(declare-function my/palette-set-footer "init-palette" (footer))
+(declare-function my/palette-set-status "init-palette" (status))
+(declare-function my/palette-set-action "init-palette" (key description))
 (declare-function my/palette-text-width "init-palette" ())
 
 (defun my/xref-at-point (fetcher alist &optional prompt)
@@ -288,11 +289,7 @@ ORIGINAL displays CONTENT, COUNTER and POSITION in lsp-bridge's buffer."
                                                           (current-local-map)))
                                    ;; The buffer is the only way to edit
                                    ;; every match, so name its key.
-                                   (my/palette-set-footer
-                                    (concat (propertize "C-c C-o" 'face 'my/palette-title)
-                                            "  "
-                                            (propertize "Open all in an editable buffer"
-                                                        'face 'shadow)))))
+                                   (my/palette-set-action "C-c C-o" "Edit all")))
                       (my/xref-at-point
                        (lambda () items) nil
                        (format "%s of %s: " my/lsp-locations-kind
@@ -316,6 +313,15 @@ ORIGINAL displays CONTENT, COUNTER and POSITION in lsp-bridge's buffer."
    "string" "number" "boolean" "array" "object" "key" "null" "enum member"
    "struct" "event" "operator" "type parameter"]
   "Names of LSP SymbolKind values.")
+
+(defconst my/lsp-symbol-icons
+  [nil nil "nodes/module" "nodes/package" "nodes/package" "nodes/class"
+   "nodes/method" "nodes/property" "nodes/field" "nodes/constructor"
+   "nodes/enum" "nodes/interface" "nodes/function" "nodes/variable"
+   "nodes/constant" "nodes/constant" "nodes/constant" "nodes/constant"
+   "nodes/variable" "nodes/class" "nodes/property" "nodes/constant"
+   "nodes/constant" "nodes/record" "nodes/field" "nodes/function" "nodes/type"]
+  "JetBrains icons of LSP SymbolKind values, as in the IDE's symbol search.")
 
 (defvar my/lsp-symbol--session nil "Minibuffer of the running symbol search.")
 (defvar my/lsp-symbol--window nil "Window whose language server is searched.")
@@ -341,7 +347,8 @@ ORIGINAL displays CONTENT, COUNTER and POSITION in lsp-bridge's buffer."
 
 (defun my/lsp-symbol--update (infos)
   "Show the symbols INFOS in the running search.
-Names, kinds and places form columns as wide as the widest of them."
+Names and places form columns, and an icon tells the kind; the panel's
+bottom line spells out the kind and the full place of the selected one."
   (let* ((root (expand-file-name my/lsp-symbol--root))
          (index (make-hash-table :test #'equal))
          (rows
@@ -360,30 +367,35 @@ Names, kinds and places form columns as wide as the widest of them."
                                  (substring file (length root))
                                (abbreviate-file-name file))
                              (1+ (plist-get start :line)))
-                     (cons file start))))
+                     (cons file start)
+                     (and (< -1 kind (length my/lsp-symbol-icons))
+                          (aref my/lsp-symbol-icons kind))
+                     (format "%s:%d" (abbreviate-file-name file)
+                             (1+ (plist-get start :line))))))
            infos))
          (name-width (min my/lsp-symbol-name-width
                           (apply #'max 0 (mapcar (lambda (row) (string-width (nth 0 row)))
                                                  rows))))
-         (kind-width (apply #'max 0 (mapcar (lambda (row) (string-width (nth 1 row)))
-                                            rows)))
          ;; Places keep their end, the file and line, within the panel.
          (place-width (max 12 (- (or (and (buffer-live-p my/lsp-symbol--session)
                                           (fboundp 'my/palette-text-width)
                                           (with-current-buffer my/lsp-symbol--session
                                             (my/palette-text-width)))
                                      100)
-                                 name-width kind-width 5)))
+                                 name-width 3)))
          (candidates nil))
-    (pcase-dolist (`(,name ,kind ,place ,target) rows)
+    (pcase-dolist (`(,name ,kind ,place ,target ,icon ,full) rows)
       (let ((candidate
              (concat (truncate-string-to-width name name-width nil ?\s "…") "  "
-                     (propertize (concat (truncate-string-to-width kind kind-width nil ?\s)
-                                         "  "
-                                         (if (> (string-width place) place-width)
-                                             (concat "…" (substring place (- 1 place-width)))
-                                           place))
+                     (propertize (if (> (string-width place) place-width)
+                                     (concat "…" (substring place (- 1 place-width)))
+                                   place)
                                  'face 'completions-annotations))))
+        (add-text-properties 0 1 `(my/completion-icon ,icon
+                                   my/completion-detail
+                                   ,(if (string-empty-p kind) full
+                                      (concat kind " · " full)))
+                             candidate)
         (unless (gethash candidate index)
           (puthash candidate target index)
           (push candidate candidates))))
@@ -392,8 +404,8 @@ Names, kinds and places form columns as wide as the widest of them."
     (when (buffer-live-p my/lsp-symbol--session)
       (with-current-buffer my/lsp-symbol--session
         ;; An empty list says why: nothing typed, or nothing indexed yet.
-        (when (fboundp 'my/palette-set-footer)
-          (my/palette-set-footer
+        (when (fboundp 'my/palette-set-status)
+          (my/palette-set-status
            (cond ((string-empty-p (or my/lsp-symbol--query ""))
                   (propertize "Type to search symbols in the project" 'face 'shadow))
                  ((null candidates)
@@ -408,10 +420,10 @@ Names, kinds and places form columns as wide as the widest of them."
   (if (string-empty-p query)
       (my/lsp-symbol--update nil)
     ;; Only while nothing is listed, so typing does not resize the panel.
-    (when (and (fboundp 'my/palette-set-footer) (null my/lsp-symbol--candidates)
+    (when (and (fboundp 'my/palette-set-status) (null my/lsp-symbol--candidates)
                (buffer-live-p my/lsp-symbol--session))
       (with-current-buffer my/lsp-symbol--session
-        (my/palette-set-footer (propertize "Searching…" 'face 'shadow))))
+        (my/palette-set-status (propertize "Searching…" 'face 'shadow))))
     (when (window-live-p my/lsp-symbol--window)
       (with-current-buffer (window-buffer my/lsp-symbol--window)
         (lsp-bridge-call-file-api "workspace_symbol" query)))))

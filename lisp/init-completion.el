@@ -41,33 +41,106 @@
 ;; Group titles are small and faded instead of a ruled line.
 (setq vertico-group-format "%s")
 
-(defun my/completion-dim-directory (candidate)
-  "Dim the directory part of file CANDIDATE so its name stands out."
-  (let ((end (string-match-p "[^/]*/?\\'" candidate)))
-    (when (and end (> end 0))
-      (add-face-text-property 0 end 'shadow t candidate))
-    candidate))
+(defun my/completion--category (candidate)
+  "Return (CATEGORY . TARGET) for CANDIDATE of the running completion.
+Mixed lists such as `consult-buffer' tag each candidate with its own."
+  (or (get-text-property 0 'multi-category candidate)
+      (cons (completion-metadata-get vertico--metadata 'category) candidate)))
+
+(declare-function my/palette-text-width "init-palette" ())
+
+(defun my/completion--after-name (name directory)
+  "Return NAME followed by DIRECTORY, faded and shortened from the left to fit."
+  (let* ((room (or (and (fboundp 'my/palette-text-width) (my/palette-text-width))
+                   80))
+         (width (max 12 (- room (string-width name) 4)))
+         (directory (if (> (string-width directory) width)
+                        (concat "…" (substring directory (- 1 width)))
+                      (copy-sequence directory))))
+    (add-face-text-property 0 (length directory) 'shadow t directory)
+    (concat name "  " directory)))
+
+(defun my/completion-name-first (candidate)
+  "Return file CANDIDATE as its name followed by its faded directory.
+Names are what one scans for, as in JetBrains' Search Everywhere."
+  (let ((start (string-match-p "[^/]*/?\\'" candidate)))
+    (if (and start (> start 0))
+        (my/completion--after-name (substring candidate start)
+                                   (substring candidate 0 start))
+      candidate)))
 
 (defun my/completion-icon (candidate)
-  "Return the icon of file or buffer CANDIDATE, or nil.
+  "Return the icon of CANDIDATE, a file, buffer or tagged item, or nil.
 The icons are those of the sidebar and the tabs; init-palette.el places
-them below its search icon."
+them below its search icon.  Other pickers name an icon in the
+`my/completion-icon' property of their candidates."
   (when (expui-icons-svg-p)
-    (pcase-let ((`(,category . ,target)
-                 ;; Mixed lists such as `consult-buffer' tag each candidate.
-                 (or (get-text-property 0 'multi-category candidate)
-                     (cons (completion-metadata-get vertico--metadata 'category)
-                           candidate))))
-      (pcase category
-        ((or 'file 'project-file) (expui-icons-icon-for-file target))
-        ('buffer (when-let* ((buffer (get-buffer target)))
-                   (expui-icons-icon-for-buffer buffer)))))))
+    (if-let* ((name (get-text-property 0 'my/completion-icon candidate)))
+        (expui-icons-icon name)
+      (pcase-let ((`(,category . ,target) (my/completion--category candidate)))
+        (pcase category
+          ((or 'file 'project-file) (expui-icons-icon-for-file target))
+          ('buffer (when-let* ((buffer (get-buffer target)))
+                     (expui-icons-icon-for-buffer buffer))))))))
+
+(defun my/completion--buffer-directory (name)
+  "Return the directory of the file or Dired buffer NAME, or nil."
+  (when-let* ((buffer (get-buffer name)))
+    (if-let* ((file (buffer-file-name buffer)))
+        (file-name-directory file)
+      (and (provided-mode-derived-p (buffer-local-value 'major-mode buffer)
+                                    'dired-mode)
+           (buffer-local-value 'default-directory buffer)))))
+
+(defun my/completion--summary (symbol)
+  "Return the first line of SYMBOL's documentation, or nil."
+  (when-let* ((doc (ignore-errors
+                     (if (fboundp symbol)
+                         (documentation symbol)
+                       (documentation-property symbol 'variable-documentation))))
+              ((not (string-empty-p doc))))
+    (car (split-string doc "\n"))))
+
+(defun my/completion-detail (candidate)
+  "Return the full location or description of CANDIDATE.
+Files, buffers, matches and xrefs have a location; commands, functions
+and variables the first line of their documentation.  init-palette.el
+shows it below the list.  Other pickers put it in the
+`my/completion-detail' property of their candidates."
+  (or (get-text-property 0 'my/completion-detail candidate)
+      (pcase-let ((`(,category . ,target) (my/completion--category candidate)))
+        (pcase category
+          ((or 'command 'function 'variable 'symbol)
+           (when-let* ((symbol (intern-soft target)))
+             (my/completion--summary symbol)))
+          ('consult-grep
+           (when (string-match "\\`\\([^:\n]+\\):\\([0-9]+\\):" target)
+             (format "%s:%s" (abbreviate-file-name
+                              (expand-file-name (match-string 1 target)))
+                     (match-string 2 target))))
+          ('consult-xref
+           (when-let* ((xref (get-text-property 0 'consult-xref target))
+                       (location (xref-item-location xref)))
+             (format "%s:%s" (abbreviate-file-name (xref-location-group location))
+                     (xref-location-line location))))
+          ((or 'file 'project-file)
+           (abbreviate-file-name (expand-file-name target)))
+          ('buffer (when-let* ((buffer (get-buffer target))
+                               (file (or (buffer-file-name buffer)
+                                         (my/completion--buffer-directory target))))
+                     (abbreviate-file-name file)))))))
 
 (defun my/completion-format-file (format candidate &rest args)
-  "Call FORMAT with CANDIDATE and ARGS, dimming directories of file candidates."
-  (when (memq (completion-metadata-get vertico--metadata 'category)
-              '(file project-file))
-    (setq candidate (my/completion-dim-directory (copy-sequence candidate))))
+  "Call FORMAT with CANDIDATE and ARGS, showing names before directories.
+Buffers of files or directories follow their name with the directory too."
+  (pcase-let ((`(,category . ,target) (my/completion--category candidate)))
+    (pcase category
+      ((or 'file 'project-file)
+       (setq candidate (my/completion-name-first candidate)))
+      ('buffer
+       (when-let* ((directory (my/completion--buffer-directory target)))
+         (setq candidate (my/completion--after-name
+                          candidate (abbreviate-file-name directory)))))))
   (apply format candidate args))
 (advice-add 'vertico--format-candidate :around #'my/completion-format-file)
 
@@ -100,22 +173,14 @@ them below its search icon."
 ;;;; Annotations
 
 ;; Commands show only their keys, like a command palette; files show none;
-;; buffers show where they are, as their icon tells the type.  M-A cycles to
-;; the detailed annotations.
+;; buffers only whether they are modified, as their icon tells the type and
+;; their directory follows the name.  M-A cycles to the detailed annotations.
 (defun my/completion-annotate-buffer (cand)
-  "Annotate buffer CAND with its directory and a dot if it is modified."
+  "Annotate buffer CAND with a dot if its file is modified."
   (when-let* ((buffer (get-buffer cand))
-              ((buffer-live-p buffer)))
-    (let ((directory (or (when-let* ((file (buffer-file-name buffer)))
-                           (file-name-directory file))
-                         (and (provided-mode-derived-p
-                               (buffer-local-value 'major-mode buffer) 'dired-mode)
-                              (buffer-local-value 'default-directory buffer)))))
-      (marginalia--fields
-       ((and directory (abbreviate-file-name directory))
-        :truncate -0.5 :face 'marginalia-file-name)
-       ((if (and (buffer-file-name buffer) (buffer-modified-p buffer)) "●" " ")
-        :face 'marginalia-modified)))))
+              ((buffer-file-name buffer))
+              ((buffer-modified-p buffer)))
+    (marginalia--fields ("●" :face 'marginalia-modified))))
 
 (setq marginalia-align 'right
       marginalia-field-width 40)

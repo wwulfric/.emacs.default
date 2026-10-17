@@ -49,6 +49,18 @@
   "Line between the input and the candidates of the panel."
   :group 'faces)
 
+(defface my/palette-tab '((t (:inherit shadow)))
+  "Tab of the panel's header that is not the current one."
+  :group 'faces)
+
+(defface my/palette-tab-active '((t (:inherit highlight)))
+  "Current tab of the panel's header."
+  :group 'faces)
+
+(defface my/palette-footer '((t (:background "gray96")))
+  "Band at the bottom of the panel holding the footer."
+  :group 'faces)
+
 (defface my/palette-mark '((t (:background "RoyalBlue")))
   "Bar at the left of the selected candidate in the panel."
   :group 'faces)
@@ -65,7 +77,20 @@ Let-bind it around code that reads from the minibuffer.")
     (consult-ripgrep . "Find in Files")
     (consult-imenu . "File Structure")
     (my/file-symbols . "File Structure"))
-  "Panel titles by command.  Other completions take their prompt as title.")
+  "Panel titles by command.
+Completions opened by no command, such as replies of a language server,
+are titled by category in `my/palette-category-titles'; others take their
+prompt as title.")
+
+(defvar my/palette-category-titles
+  '((imenu . "File Structure")
+    (consult-grep . "Find in Files"))
+  "Panel titles by completion category, for completions without a command.")
+
+(defvar my/palette-actions
+  '((consult-buffer "<" "Narrow"))
+  "Keys named at the right of the footer, by command, as (KEY DESCRIPTION).
+See `my/palette-set-action'.")
 
 (defvar my/palette-ignore-commands
   '(eval-expression edebug-eval-expression debugger-eval-expression
@@ -76,13 +101,13 @@ Expressions keep ElDoc beside them; live filters keep their page in view.")
 (defvar my/palette-top 0.12
   "Top edge of the palette as a fraction of the frame height.")
 
-(defvar my/palette-width '(0.45 64 . 100)
+(defvar my/palette-width '(0.55 72 . 120)
   "Palette width: fraction of the frame, then minimum and maximum columns.")
 
 (defvar my/palette-point-width '(48 . 100)
   "Minimum and maximum columns of the panel at point.")
 
-(defvar my/palette-rows '((palette . 10) (point . 8))
+(defvar my/palette-rows '((palette . 14) (point . 8))
   "Candidates shown by each placement.")
 
 (defvar my/palette-line-spacing '(0.22 . 0.22)
@@ -122,30 +147,55 @@ the input and the candidates' names start at `my/palette-indent'.")
 (defvar-local my/palette--placement nil
   "Placement of this minibuffer session, or nil when it is not floating.")
 
+(defvar-local my/palette--editor nil
+  "Editor window selected when this minibuffer opened.")
+
 (defvar-local my/palette--anchor nil
   "Frame pixel position (X Y LINE-HEIGHT) of the symbol for `point'.")
 
 (defvar-local my/palette--width 0
   "Width in columns of the panel at point, fixed after its first display.")
 
-(defvar-local my/palette--footer nil
-  "Text of the line at the bottom of the panel, or nil for none.")
+(defvar-local my/palette--list nil
+  "Non-nil when this panel lists candidates, so that it has a footer.")
+
+(defvar-local my/palette--status nil
+  "Status shown at the left of the footer instead of the detail, or nil.")
+
+(defvar-local my/palette--action nil
+  "Key named at the right of the footer, as (KEY DESCRIPTION), or nil.")
 
 (defvar-local my/palette--line-face nil
   "Face attributes of a panel's title and footer lines.")
 
-(defvar-local my/palette--edge-face nil
-  "Face attributes of a panel's empty lines padding its top or bottom.")
+(defvar-local my/palette--footer-face nil
+  "Face attributes of a panel's footer band.")
+
+(defvar-local my/palette--tabs nil
+  "Tabs shown in the header instead of the title, or nil.")
+
+(defvar-local my/palette--icon nil
+  "Overlay showing the search icon in place of the prompt, or nil.")
+
+(defvar-local my/palette--input-start nil
+  "Overlay of the space before the input, or nil.")
+
+(defvar-local my/palette--prefix nil
+  "Overlay showing the prefix of the input, or nil.")
 
 (defvar-local my/palette--title nil
-  "Title of this completion session, or nil when it shows its prompt.")
+  "Title of this minibuffer, or nil when it shows its prompt.")
 
 ;;;; Placement
 
 (defun my/palette--origin ()
-  "Return the editor window that was selected when the minibuffer opened."
-  (let ((window (minibuffer-selected-window)))
-    (if (window-live-p window) window (frame-first-window))))
+  "Return the editor window that was selected when the minibuffer opened.
+It is kept from the start: a click on the panel selects the panel's own
+window."
+  (let ((window (or my/palette--editor (minibuffer-selected-window))))
+    (if (and (window-live-p window) (not (frame-parent (window-frame window))))
+        window
+      (frame-first-window (or (frame-parent) (selected-frame))))))
 
 (defun my/palette--symbol-anchor (window)
   "Return the frame pixel position of the symbol at point in WINDOW."
@@ -172,7 +222,8 @@ the input and the candidates' names start at `my/palette-indent'.")
                (width (plist-get info :posframe-width))
                (height (plist-get info :posframe-height))
                (below (+ y line)))
-    (cons (max 0 (min (- x my/palette-border-width my/palette-padding)
+    (cons (max 0 (min (- x my/palette-border-width my/palette-padding
+                         my/palette-indent)
                       (- (plist-get info :parent-frame-width) width)))
           (max 0 (if (> (+ below height) (plist-get info :parent-frame-height))
                      (- y height)
@@ -232,6 +283,10 @@ the input and the candidates' names start at `my/palette-indent'.")
 
 (defun my/palette--display ()
   "Show this minibuffer in its panel and hide the echo-area copy."
+  ;; A click on the panel selects its frame; the panel belongs to the
+  ;; editor frame.
+  (when-let* ((parent (frame-parent)))
+    (select-frame parent t))
   (when-let* ((window (active-minibuffer-window))
               ((eq (window-buffer window) (current-buffer))))
     (setq-local max-mini-window-height 1)
@@ -263,6 +318,13 @@ the input and the candidates' names start at `my/palette-indent'.")
 (defun my/palette--title ()
   "Return the title for this minibuffer: its command's, else its prompt."
   (let ((title (or (alist-get this-command my/palette-titles)
+                   (and minibuffer-completion-table
+                        (alist-get (completion-metadata-get
+                                    (completion-metadata
+                                     "" minibuffer-completion-table
+                                     minibuffer-completion-predicate)
+                                    'category)
+                                   my/palette-category-titles))
                    (string-trim (minibuffer-prompt) "[ \t]+" "[ \t:：]+"))))
     (unless (string-empty-p title) title)))
 
@@ -275,18 +337,15 @@ the input and the candidates' names start at `my/palette-indent'.")
       (number-to-string vertico--total))))
 
 (defun my/palette--header ()
-  "Return the title line: the title at the left, the count at the right."
+  "Return the title line: the title or tabs at the left, the count at the right."
   (let ((count (my/palette--count)))
     (concat (my/palette--space-to my/palette-icon-indent)
-            (and my/palette--title
-                 (propertize my/palette--title 'face 'my/palette-title))
+            (or my/palette--tabs
+                (and my/palette--title
+                     (propertize (my/palette--literal my/palette--title)
+                                 'face 'my/palette-title)))
             (when count
-              (let ((width (string-pixel-width
-                            (propertize count 'face
-                                        `(:height ,my/palette-header-height)))))
-                (concat (propertize " " 'display
-                                    `(space :align-to (- right (,width))))
-                        (propertize count 'face 'shadow)))))))
+              (my/palette--at-right (propertize count 'face 'shadow))))))
 
 (defun my/palette--remap (line spec)
   "Draw LINE, `header-line' or `mode-line', with face attributes SPEC.
@@ -298,22 +357,78 @@ The minibuffer window has neither line, so only the panel shows them."
                   (cons (cons face spec)
                         (assq-delete-all face (copy-sequence face-remapping-alist)))))))
 
-(defun my/palette--footer ()
-  "Return the bottom line: the footer, or a blank line padding the panel."
-  (if my/palette--footer
-      (concat (my/palette--space-to my/palette-icon-indent) my/palette--footer)
-    " "))
+(defun my/palette--literal (text)
+  "Return TEXT for the header or footer, which read % as a format directive."
+  (string-replace "%" "%%" text))
 
-(defun my/palette-set-footer (footer)
-  "Show FOOTER, a string, at the bottom of this minibuffer's panel.
-A nil FOOTER removes it.  Call it in the minibuffer once the panel is set
-up, for hints that apply to one picker only."
-  (when (and my/palette--placement (not (equal footer my/palette--footer)))
-    (setq my/palette--footer footer)
-    (my/palette--remap 'mode-line (if footer my/palette--line-face
-                                    my/palette--edge-face))
-    ;; The bottom line changes height: fit the panel once it shows.
-    (run-at-time 0 nil #'my/palette--refit (current-buffer))))
+(defun my/palette--fit (text width)
+  "Return TEXT shortened from the left to WIDTH columns, keeping its end."
+  (if (> (string-width text) width)
+      (concat "…" (substring text (- 1 (max 1 width))))
+    text))
+
+(defun my/palette--at-right (text)
+  "Return TEXT, in the title and footer size, aligned to the right edge."
+  (let ((width (string-pixel-width
+                (propertize text 'face `(:height ,my/palette-header-height)))))
+    (concat (propertize " " 'display `(space :align-to (- right (,width))))
+            text)))
+
+(defun my/palette--detail (width)
+  "Return the full location or description of the selected candidate.
+It is shortened from the left to WIDTH columns."
+  (when-let* (((fboundp 'my/completion-detail))
+              ((>= vertico--index 0))
+              (detail (my/completion-detail (vertico--candidate))))
+    (propertize (my/palette--literal (my/palette--fit detail width))
+                'face 'shadow)))
+
+(defun my/palette--footer ()
+  "Return the bottom line.
+A list's footer tells about the selected candidate, or the picker's status,
+at the left, and names one key at the right.  Without a list it is blank,
+padding the panel."
+  (if (not my/palette--list)
+      " "
+    (let* ((action (when my/palette--action
+                     (concat (propertize (my/palette--literal (car my/palette--action))
+                                         'face 'my/palette-title)
+                             " "
+                             (propertize (my/palette--literal (cadr my/palette--action))
+                                         'face 'shadow))))
+           (room (- (+ 2 (or (my/palette-text-width) 80))
+                    (if action (+ 3 (string-width action)) 0))))
+      (concat (my/palette--space-to my/palette-icon-indent)
+              (if my/palette--status
+                  (my/palette--literal (my/palette--fit my/palette--status room))
+                (my/palette--detail room))
+              (and action (my/palette--at-right action))))))
+
+(defun my/palette-set-status (status)
+  "Show STATUS at the left of this panel's footer, instead of the detail.
+STATUS tells why a list is empty, for example; nil gives the place back to
+the selected candidate.  Call it in the minibuffer."
+  (when my/palette--placement
+    (setq my/palette--status status)
+    (force-mode-line-update t)))
+
+(defun my/palette-set-tabs (tabs)
+  "Show TABS, a string, in this panel's header instead of its title.
+Pickers that are kinds of one search show which kind is open; see
+init-search.el.  Call it in the minibuffer."
+  (when my/palette--placement
+    (setq my/palette--tabs tabs)
+    ;; Every kind of the search shows the search icon, lists or not.
+    (when (overlayp my/palette--icon)
+      (overlay-put my/palette--icon 'display (my/palette--search-icon)))
+    (force-mode-line-update t)))
+
+(defun my/palette-set-action (key description)
+  "Name KEY, a string, and what it does, DESCRIPTION, in this panel's footer.
+Each picker names at most one key, one that is easy to miss."
+  (when my/palette--placement
+    (setq my/palette--action (and key (list key description)))
+    (force-mode-line-update t)))
 
 (defun my/palette-text-width ()
   "Return the columns for candidate text in this minibuffer's panel, or nil."
@@ -323,24 +438,59 @@ up, for hints that apply to one picker only."
     (- (window-body-width (frame-root-window frame))
        (ceiling my/palette-indent (frame-char-width frame)))))
 
-(defun my/palette--replace-prompt ()
-  "Show an icon instead of the prompt, which the title replaces.
-The prompt's last character becomes the space before the input."
+(defun my/palette--search-icon ()
+  "Return the display of the search icon."
+  ;; JetBrains' search icon, in the face's color in the mono style.
+  ;; Display strings ignore display properties inside them, so the image
+  ;; is the display itself.
+  (if (expui-icons-svg-p) (expui-icons-image "general/search") "🔍"))
+
+(defun my/palette--replace-prompt (search)
+  "Hide the prompt, which the title replaces, showing an icon if SEARCH.
+The prompt's last character becomes the space before the input, so that
+input lines up with candidates, or with the input of other panels."
   (let ((end (minibuffer-prompt-end)))
     (when (> end (1+ (point-min)))
       (let ((icon (make-overlay (point-min) (1- end))))
-        ;; JetBrains' search icon, in the face's color in the mono style.
-        ;; Display strings ignore display properties inside them, so the
-        ;; image is the display itself.
-        (overlay-put icon 'display (or (and (expui-icons-svg-p)
-                                            (expui-icons-image "general/search"))
-                                       "🔍"))
+        (overlay-put icon 'display (if search (my/palette--search-icon) ""))
         (overlay-put icon 'face 'shadow)
-        (overlay-put icon 'before-string (my/palette--space-to my/palette-icon-indent))))
+        (overlay-put icon 'before-string (my/palette--space-to my/palette-icon-indent))
+        (setq my/palette--icon icon)))
     (when (> end (point-min))
       ;; A display string would ignore an alignment inside it.
-      (overlay-put (make-overlay (1- end) end) 'display
-                   `(space :align-to (,my/palette-indent))))))
+      (let ((space (make-overlay (1- end) end)))
+        (overlay-put space 'display `(space :align-to (,my/palette-indent)))
+        (setq my/palette--input-start space)))))
+
+(defun my/palette-set-prefix (prefix)
+  "Show PREFIX, faded, before the input of this panel, or nothing if nil.
+It reads as the start of the input, as in VS Code's quick open, without
+being part of what is matched.  It is drawn on the prompt's last
+characters, so that messages shown after the input stay after it.  Call
+it in the minibuffer."
+  (when (overlayp my/palette--input-start)
+    (let* ((end (overlay-end my/palette--input-start))
+           (start (overlay-start my/palette--input-start))
+           ;; The space before the input moves one character back, onto the
+           ;; icon's last character, to leave the prompt's last one for
+           ;; the prefix.
+           (room (and prefix (overlayp my/palette--icon)
+                      (> (overlay-end my/palette--icon)
+                         (1+ (overlay-start my/palette--icon))))))
+      (if (not room)
+          (progn
+            (move-overlay my/palette--input-start start end)
+            (when (overlayp my/palette--prefix) (delete-overlay my/palette--prefix)))
+        (move-overlay my/palette--icon (overlay-start my/palette--icon) (1- start))
+        (move-overlay my/palette--input-start (1- start) start)
+        (unless (overlayp my/palette--prefix)
+          (setq my/palette--prefix (make-overlay start end)))
+        (move-overlay my/palette--prefix start end)
+        (overlay-put my/palette--prefix 'display
+                     ;; Plain, not in the bold of the prompt it covers.
+                     (propertize (concat prefix " ")
+                                 'face `(:inherit shadow :weight normal
+                                         :height ,my/palette-input-height)))))))
 
 (defun my/palette--space-to (x)
   "Return a space reaching X pixels from the start of the text area."
@@ -405,38 +555,46 @@ indentation is made of exact widths instead."
              (not (memq this-command my/palette-ignore-commands))
              my/palette-placement))
   (when my/palette--placement
-    (setq my/palette--width 0
+    (setq my/palette--editor nil
+          my/palette--editor (my/palette--origin)
+          my/palette--width 0
           my/palette--anchor (and (eq my/palette--placement 'point)
                                   (my/palette--symbol-anchor (my/palette--origin)))
-          ;; Plain prompts, such as a new name, keep their wording.
-          my/palette--title (and (bound-and-true-p vertico--input)
-                                 (my/palette--title)))
+          my/palette--list (bound-and-true-p vertico--input)
+          my/palette--title (my/palette--title))
     (setq-local vertico-count (alist-get my/palette--placement my/palette-rows)
                 truncate-lines t
                 auto-hscroll-mode 'current-line
-                ;; The header line holds the title; an empty mode line pads
-                ;; the bottom.
+                ;; The header line holds the title, the mode line the footer
+                ;; of a list or else padding.
                 header-line-format '(:eval (my/palette--header))
                 mode-line-format '(:eval (my/palette--footer)))
     (let* ((background (face-background 'my/palette nil t))
            (plain `(:box nil :overline nil :underline nil :inherit nil
                          :background ,background))
            (edge `(:height ,my/palette-edge-height ,@plain)))
-      (setq my/palette--footer nil
-            my/palette--edge-face edge
+      (setq my/palette--status nil
+            my/palette--tabs nil
+            my/palette--icon nil
+            my/palette--input-start nil
+            my/palette--prefix nil
+            my/palette--action (alist-get this-command my/palette-actions)
             my/palette--line-face
             `(:height ,my/palette-header-height
                       ,@plain :box (:line-width (0 . ,my/palette-header-padding)
-                                                :color ,background)))
-      ;; Without completion the header line is empty, padding like the
-      ;; mode line.
-      (my/palette--remap 'header-line (if (bound-and-true-p vertico--input)
-                                          my/palette--line-face
-                                        edge))
-      (my/palette--remap 'mode-line edge))
+                                                :color ,background))
+            my/palette--footer-face
+            (let ((band (face-background 'my/palette-footer nil t)))
+              `(:height ,my/palette-header-height
+                        :overline nil :underline nil :inherit nil :background ,band
+                        :box (:line-width (0 . ,my/palette-header-padding)
+                                          :color ,band))))
+      (my/palette--remap 'header-line my/palette--line-face)
+      (my/palette--remap 'mode-line (if my/palette--list my/palette--footer-face
+                                      edge)))
     (let ((start (minibuffer-prompt-end)))
       (when my/palette--title
-        (my/palette--replace-prompt))
+        (my/palette--replace-prompt my/palette--list))
       ;; Typed text grows the overlay, so it keeps the larger size.
       (overlay-put (make-overlay start (point-max) nil nil t)
                    'face `(:height ,my/palette-input-height)))
@@ -452,6 +610,9 @@ indentation is made of exact widths instead."
 Deferred so that a prompt which directly follows reuses the visible panel."
   (when-let* ((window (active-minibuffer-window)))
     (set-window-vscroll window 0))
+  ;; Never leave the hidden panel selected: keys would go nowhere.
+  (when-let* ((parent (frame-parent)))
+    (select-frame parent t))
   (run-at-time 0 nil #'my/palette--after-exit (current-buffer)))
 
 (defun my/palette--after-exit (buffer)

@@ -300,8 +300,10 @@ window."
       (unless (equal (face-foreground 'my/palette-edge frame t) line)
         (set-face-foreground 'my/palette-edge line frame)))
     ;; The cut-off corners show what the panel sits on.
-    (setq my/palette--outside
-          (face-background 'default (window-frame origin) t))))
+    ;; Editor windows have the theme's background, whatever their frame's.
+    (setq my/palette--outside (if (fboundp 'my/islands--card)
+                                  (my/islands--card)
+                                (face-background 'default (window-frame origin) t)))))
 
 (defun my/palette--display ()
   "Show this minibuffer in its panel and hide the echo-area copy."

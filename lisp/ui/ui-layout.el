@@ -11,6 +11,21 @@
 
 (require 'seq)
 
+(defvar my/ui-line-end-inset 0
+  "Pixels kept free at the right end of header and mode lines.
+A number, or a function returning one for the window being drawn.
+Rounded window corners (init-islands.el) are drawn there.")
+
+(defun my/ui-line-end-inset ()
+  "Return the pixels kept free at the right end of this window's lines."
+  (if (functionp my/ui-line-end-inset)
+      (funcall my/ui-line-end-inset)
+    my/ui-line-end-inset))
+
+(defun my/ui-line-end ()
+  "Return the `:align-to' position where header and mode line text ends."
+  `(- (+ right right-fringe right-margin) (,(my/ui-line-end-inset))))
+
 (defun my/ui-space (width)
   "Return a space WIDTH pixels wide."
   (propertize " " 'display `(space :width (,(max 0 width)))))
@@ -127,7 +142,7 @@ applies, the current buffer's by default."
 ;; everything between them stays native text.
 
 (defvar my/ui--corner-cache (make-hash-table :test #'equal)
-  "Corner strings by (CORNER RADIUS HEIGHT INSIDE OUTSIDE LINE).")
+  "Corner strings by (CORNER RADIUS HEIGHT INSIDE OUTSIDE LINE ASCENT).")
 
 (defun my/ui--svg-color (color)
   "Return COLOR, which may be an Emacs color name, as #RRGGBB."
@@ -135,13 +150,16 @@ applies, the current buffer's by default."
       (apply #'format "#%02x%02x%02x" (mapcar (lambda (v) (/ v 257)) values))
     "none"))
 
-(defun my/ui-corner (corner radius height inside outside line)
+(defun my/ui-corner (corner radius height inside outside line &optional ascent)
   "Return a string showing CORNER of a rounded box, RADIUS by HEIGHT pixels.
 CORNER is `top-left', `top-right', `bottom-left' or `bottom-right'.  The
 box is filled with INSIDE and outlined by a one-pixel LINE; the cut-off
 corner shows OUTSIDE, the color the box sits on.  The image fills a row
-HEIGHT pixels high and ignores the row's box, overline and underline."
-  (let ((key (list corner radius height inside outside line)))
+HEIGHT pixels high and ignores the row's box, overline and underline.
+ASCENT places it in the row as the image property does, `center' by
+default; a row whose height comes from a spacer uses that spacer's ascent.
+LINE nil draws no outline."
+  (let ((key (list corner radius height inside outside line ascent)))
     (or (gethash key my/ui--corner-cache)
         (puthash
          key
@@ -162,7 +180,7 @@ HEIGHT pixels high and ignores the row's box, overline and underline."
                              h r r r r r h (my/ui--svg-color inside)
                              h r a a r (my/ui--svg-color line))))
            (propertize " " 'face '(:box nil :overline nil :underline nil)
-                       'display (create-image svg 'svg t :ascent 'center)))
+                       'display (create-image svg 'svg t :ascent (or ascent 'center))))
          my/ui--corner-cache))))
 
 (defun my/ui-rounded-line (text radius height inside outside line top)

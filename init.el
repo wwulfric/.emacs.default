@@ -64,6 +64,9 @@
 ;; Ink owns face styling; component configs own layout and interaction.
 (add-to-list 'custom-theme-load-path (expand-file-name "ui" emacs-root-dir))
 (load-theme 'ink t)
+;; Windows as rounded cards on a gray canvas, after the theme it repaints.
+(require 'init-islands)
+(my/islands-mode 1)
 (require 'init-jieba-word)
 (require 'init-lsp)
 (require 'init-search)

@@ -230,14 +230,14 @@ As in a New UI tool window, the toolbar shows when focused or hovered."
                 'face 'my/dirvish-project-title))
          ;; Shorten the title rather than let the window clip the toolbar.
          (room (- (window-body-width nil t) toolbar-width
-                  (string-pixel-width chevron) 8)))
+                  (string-pixel-width chevron) 8 (my/ui-line-end-inset))))
     (concat (propertize " " 'face 'header-line 'display (my/ui-header-space 0))
             (my/dirvish-side-button
              #'my/dirvish-side-project-menu "Switch Project"
              (truncate-string-pixelwise name room (current-buffer) "…")
              chevron)
             (when toolbar
-              (my/ui-at-right toolbar '(+ right right-fringe right-margin))))))
+              (my/ui-at-right toolbar (my/ui-line-end))))))
 
 (defun my/dirvish-side-in-editor (function &rest args)
   "Call FUNCTION with ARGS, or interactively, from the last editor window.

@@ -205,15 +205,15 @@ Buffers of files or directories follow their name with the directory too."
  consult-xref
  :preview-key "M-."
  consult-ripgrep consult-git-grep consult-grep
- :preview-key '(:debounce 0.3 any))
+ :preview-key '(:debounce 0.3 any)
+ ;; Go to the line on RET, not while typing its number.
+ consult-goto-line
+ :preview-key nil)
 
-;; JetBrains macOS keys, matching s-1 for the project sidebar.
+;; JetBrains macOS keys, matching s-1 for the project sidebar.  Searches of
+;; files, text, lines and symbols are kinds of one window: init-search.el.
 (keymap-global-set "C-x b" #'consult-buffer)
 (keymap-global-set "s-e" #'consult-buffer)            ; Recent files
-(keymap-global-set "s-O" #'project-find-file)         ; Go to file
-(keymap-global-set "s-F" #'consult-ripgrep)           ; Find in files
-(keymap-global-set "s-l" #'consult-goto-line)         ; Go to line
-(keymap-global-set "M-g g" #'consult-goto-line)
 (keymap-global-set "M-g i" #'consult-imenu)
 
 (provide 'init-completion)

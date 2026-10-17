@@ -473,7 +473,6 @@ bottom line spells out the kind and the full place of the selected one."
       (lsp-bridge-jump-to-file (car target) (cdr target)))))
 
 (require 'lsp-bridge-imenu)
-(setq lsp-bridge-imenu-function #'consult-imenu)
 
 (defun my/file-symbols ()
   "Go to a symbol of this file, from the language server when there is one."
@@ -483,14 +482,13 @@ bottom line spells out the kind and the full place of the selected one."
       (lsp-bridge-imenu)
     (consult-imenu)))
 
-;; JetBrains macOS keys.  Cmd-click stays on s-mouse-1.
-(keymap-global-set "s-<f12>" #'my/file-symbols)          ; File structure
+;; JetBrains macOS keys.  Cmd-click stays on s-mouse-1.  File structure and
+;; project symbols are kinds of the search window: init-search.el.
 (dolist (map (list lsp-bridge-mode-map lsp-bridge-source-mode-map))
   (keymap-set map "s-b" #'lsp-bridge-find-def)          ; Declaration
   (keymap-set map "M-s-b" #'lsp-bridge-find-impl)       ; Implementations
   (keymap-set map "M-<f7>" #'lsp-bridge-find-references) ; Usages
-  (keymap-set map "S-<f6>" #'lsp-bridge-rename)          ; Rename
-  (keymap-set map "s-o" #'my/lsp-workspace-symbol))      ; Symbol
+  (keymap-set map "S-<f6>" #'lsp-bridge-rename))         ; Rename
 
 
 (provide 'init-lsp)

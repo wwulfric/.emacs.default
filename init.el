@@ -66,6 +66,7 @@
 (load-theme 'ink t)
 (require 'init-jieba-word)
 (require 'init-lsp)
+(require 'init-search)
 (require 'init-navigation)
 ;; Per-project workspaces and the start page shown without file arguments.
 (require 'init-workspace)

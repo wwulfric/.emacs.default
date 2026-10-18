@@ -469,7 +469,8 @@ Outside the sidebar, preserve Dired's usual mouse behavior."
 (force-mode-line-update t)
 
 (defun my/dirvish-refresh-focus (frame)
-  "Refresh sidebar selection faces when FRAME's selected window changes."
+  "Render FRAME's sidebars and their selection faces.
+Run when FRAME's selected window or a window's buffer changes."
   (let ((selected (frame-selected-window frame)))
     (dolist (window (window-list frame 'no-minibuffer))
       (with-current-buffer (window-buffer window)
@@ -481,6 +482,11 @@ Outside the sidebar, preserve Dired's usual mouse behavior."
           (dirvish--render-attrs window selected))))))
 
 (add-hook 'window-selection-change-functions #'my/dirvish-refresh-focus)
+;; Dirvish renders only the selected window before redisplay.  A command
+;; that opens the sidebar and then selects another window (or never selects
+;; it) leaves no redisplay with the sidebar selected, and no selection change
+;; either, so its rows would stay raw Dired text.
+(add-hook 'window-buffer-change-functions #'my/dirvish-refresh-focus)
 
 (defun my/dirvish-root ()
   "Return the current project root, or the current directory."

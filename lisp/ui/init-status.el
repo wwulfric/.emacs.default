@@ -4,16 +4,17 @@
 ;; As in JetBrains IDEs, one bar along the frame's bottom edge tells about
 ;; the window being edited, instead of a mode line under each window:
 ;;
-;;   ☰  Haxl › Core › Monad.hs  ●       Saved       E3 W2  287:12  LF  UTF-8  Haskell
+;;   ☰  Haxl › Core › Monad.hs  ●     Saved     E3 W2  287:12  LF  UTF-8  🔓  Haskell
 ;;
 ;; At the left the mode menu (frame-setting.el), the file's place in its
 ;; project and its state; in the middle the last message; at the right
-;; diagnostics, position, line ends, encoding and mode; as in JetBrains, the
-;; title bar names the project and branch.  Like awesome-tray, the bar is
-;; the text of the idle echo area, whose minibuffer
-;; opens in a floating panel (init-palette.el); it sits on the canvas below
-;; the cards (init-islands.el).  Messages are drawn in the bar rather than
-;; replacing it; a long one is cut short, and a click shows them all.
+;; diagnostics, position, line ends, encoding, a lock toggling read-only,
+;; and mode; as in JetBrains, the title bar names the project and branch.
+;; Like awesome-tray, the bar is the text of the idle echo area, whose
+;; minibuffer opens in a floating panel (init-palette.el); it sits on the
+;; canvas below the cards (init-islands.el).  Messages are drawn in the bar
+;; rather than replacing it; a long one is cut short, and a click shows
+;; them all.
 ;; A window's mode line keeps only the bottom edge of its card, as tall as
 ;; the card's rounded corners.  Terminal frames keep the full mode line.
 
@@ -28,6 +29,7 @@
 (declare-function my/ui-status-line "frame-setting" ())
 (declare-function my/dirvish-side-bars "init-dirvish" (dv))
 (declare-function project-root "project" (project))
+(declare-function expui-icons-icon "expui-icons" (name &rest props))
 (defvar my/ui-diagnostic-summary)
 (defvar my/islands-mode)
 (defvar my/islands-radius)
@@ -179,10 +181,9 @@ The title bar names the project and its branch (init-frame-title.el)."
                             'face 'my/status))))))
 
 (defun my/status--flags ()
-  "Return the current buffer's state: modified, read-only, recording..."
+  "Return the current buffer's state: modified, narrowed, recording..."
   (let ((flags (delq nil
                      (list (when (and buffer-file-name (buffer-modified-p)) "●")
-                           (when buffer-read-only "Read-only")
                            (when (buffer-narrowed-p) "Narrowed")
                            (when defining-kbd-macro "Recording")
                            (when current-input-method current-input-method-title)
@@ -216,6 +217,11 @@ The title bar names the project and its branch (init-frame-title.el)."
   (select-window (my/status--window))
   (when (fboundp 'lsp-bridge-diagnostic-list)
     (call-interactively #'lsp-bridge-diagnostic-list)))
+
+(defun my/status-toggle-read-only (_event)
+  "Make the buffer of the window the bar tells about writable or read-only."
+  (with-selected-window (my/status--window)
+    (read-only-mode 'toggle)))
 
 (defun my/status-messages (_event)
   "Show every message, including those the bar cut short.
@@ -252,9 +258,23 @@ of their own that closing the tab would leave behind."
                      (propertize position 'face 'my/status)
                      (propertize (car encoding) 'face 'my/status-muted)
                      (propertize (cadr encoding) 'face 'my/status-muted)
+                     (my/status--lock)
                      (propertize (format-mode-line mode-name nil window)
                                  'face 'my/status)))
      (my/ui-space my/status-gap))))
+
+(defun my/status--lock ()
+  "Return the lock of the current buffer, which toggles it when clicked.
+As in JetBrains, a file shows it open or closed; any other buffer only
+when it is read-only."
+  (when (or buffer-read-only buffer-file-name)
+    (my/status--item
+     (if (fboundp 'expui-icons-icon)
+         (expui-icons-icon (if buffer-read-only "general/locked" "general/unlocked")
+                           :face 'my/status-muted)
+       (propertize (if buffer-read-only "Read-only" "Writable") 'face 'my/status-muted))
+     #'my/status-toggle-read-only
+     (if buffer-read-only "Make writable" "Make read-only"))))
 
 (defun my/status--width (text)
   "Return the width of TEXT in pixels as the bar shows it."

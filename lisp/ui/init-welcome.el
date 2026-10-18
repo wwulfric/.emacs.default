@@ -205,8 +205,8 @@ and CJK glyphs that a column count gets wrong."
 
 (defun my/welcome-hint-lines (pairs content)
   "Lay out PAIRS of key and description as a grid in CONTENT columns.
-Keys are right-aligned in a slot per column so the descriptions of a
-column start at the same place; columns are as many as fit, at most three."
+The key caps of a column share one width, keys centered, so caps and
+descriptions line up; columns are as many as fit, at most three."
   (let ((widest (lambda (strings) (apply #'max 0 (mapcar #'string-width strings))))
         rows step key-widths)
     (cl-loop for columns from 3 downto 1
@@ -223,10 +223,14 @@ column start at the same place; columns are as many as fit, at most three."
              collect
              (cl-loop for (key . description) in row
                       for column from 0
-                      for edge = (+ my/welcome-indent (* column step) (car (nth column key-widths)))
-                      concat (my/ui-at-right
-                              (propertize (concat " " key " ") 'face 'my/welcome-key)
-                              edge)
+                      for start = (+ my/welcome-indent (* column step))
+                      for slot = (car (nth column key-widths))
+                      for pad = (- slot (string-width key))
+                      for edge = (+ start slot)
+                      concat (propertize " " 'display `(space :align-to ,start))
+                      concat (propertize (concat (make-string (/ pad 2) ?\s) key
+                                                 (make-string (- pad (/ pad 2)) ?\s))
+                                         'face 'my/welcome-key)
                       ;; Place by position, not after the cap, whose box may
                       ;; overflow its slot by a pixel or two.
                       concat (propertize " " 'display `(space :align-to ,(1+ edge)))

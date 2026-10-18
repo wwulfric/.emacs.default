@@ -34,7 +34,9 @@
 (defface my/welcome-unavailable '((t (:inherit shadow :slant italic)))
   "Projects whose directory cannot be found." :group 'my/welcome)
 (defface my/welcome-key '((t (:inherit fixed-pitch :weight bold)))
-  "Key names in the hint line." :group 'my/welcome)
+  "Key caps in the hint grid." :group 'my/welcome)
+(defface my/welcome-hint '((t (:inherit shadow)))
+  "What each key in the hint grid does." :group 'my/welcome)
 (defface my/welcome-row '((t (:inherit highlight)))
   "Highlight of the selected row, limited to the content column."
   :group 'my/welcome)
@@ -195,12 +197,40 @@ and CJK glyphs that a column count gets wrong."
     (concat (propertize left 'face 'my/welcome-heading)
             (my/ui-at-right right (+ my/welcome-indent content)))))
 
-(defun my/welcome-hints (pairs)
-  "Format PAIRS of key and description as a hint line."
-  (mapconcat (lambda (pair)
-               (concat (propertize (car pair) 'face 'my/welcome-key) " "
-                       (propertize (cdr pair) 'face 'shadow)))
-             pairs "   "))
+(defconst my/welcome-hint-list
+  '(("RET" . "Open") ("C-u RET" . "Open in new window") ("1-9" . "Quick open")
+    ("o" . "Open directory…") ("/" . "Filter") ("g" . "Refresh")
+    ("*" . "Pin") ("d" . "Remove from list") ("q" . "Close"))
+  "Key hints under the lists, in reading order.")
+
+(defun my/welcome-hint-lines (pairs content)
+  "Lay out PAIRS of key and description as a grid in CONTENT columns.
+Keys are right-aligned in a slot per column so the descriptions of a
+column start at the same place; columns are as many as fit, at most three."
+  (let ((widest (lambda (strings) (apply #'max 0 (mapcar #'string-width strings))))
+        rows step key-widths)
+    (cl-loop for columns from 3 downto 1
+             do (setq rows (seq-partition pairs columns)
+                      step (/ content columns)
+                      ;; A key cap is the key with a space on each side.
+                      key-widths (cl-loop for column below columns
+                                          for cells = (delq nil (mapcar (lambda (row) (nth column row)) rows))
+                                          collect (cons (+ 2 (funcall widest (mapcar #'car cells)))
+                                                        (funcall widest (mapcar #'cdr cells)))))
+             until (cl-every (lambda (widths) (<= (+ (car widths) 1 (cdr widths) 2) step))
+                             key-widths))
+    (cl-loop for row in rows
+             collect
+             (cl-loop for (key . description) in row
+                      for column from 0
+                      for edge = (+ my/welcome-indent (* column step) (car (nth column key-widths)))
+                      concat (my/ui-at-right
+                              (propertize (concat " " key " ") 'face 'my/welcome-key)
+                              edge)
+                      ;; Place by position, not after the cap, whose box may
+                      ;; overflow its slot by a pixel or two.
+                      concat (propertize " " 'display `(space :align-to ,(1+ edge)))
+                      concat (propertize description 'face 'my/welcome-hint)))))
 
 (defun my/welcome-render ()
   "Redraw the start page, keeping the selected row when possible."
@@ -217,7 +247,7 @@ and CJK glyphs that a column count gets wrong."
                                   root (or (plist-get (my/workspace-meta-get root) :name) "")))
                                all))
          (files (seq-filter #'my/welcome-match-p (my/welcome-recent-files all)))
-         (body (+ 9 (max 1 (length projects)) (if files (+ 3 (length files)) 0))))
+         (body (+ 10 (max 1 (length projects)) (if files (+ 3 (length files)) 0))))
     (setq my/welcome-entries projects
           my/welcome-indent indent)
     (erase-buffer)
@@ -255,12 +285,8 @@ and CJK glyphs that a column count gets wrong."
                                 (cons 'file file) content)))
     (insert "\n")
     (my/welcome-insert-line indent (propertize (make-string content ?─) 'face 'my/welcome-rule))
-    (my/welcome-insert-line indent (my/welcome-hints '(("RET" . "Open") ("1-9" . "Quick open")
-                                                       ("C-u RET" . "Open in new window")
-                                                       ("o" . "Open directory…"))))
-    (my/welcome-insert-line indent (my/welcome-hints '(("*" . "Pin") ("d" . "Remove from list")
-                                                       ("/" . "Filter") ("g" . "Refresh")
-                                                       ("q" . "Close"))))
+    (dolist (line (my/welcome-hint-lines my/welcome-hint-list content))
+      (my/welcome-insert-line indent line))
     (goto-char (point-min))
     (let ((match (and selected (text-property-search-forward 'my/welcome-target selected t))))
       (goto-char (if match (prop-match-beginning match) (point-min)))

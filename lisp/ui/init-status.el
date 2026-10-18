@@ -299,7 +299,22 @@ ROOM is the width free for it and TOTAL the bar's; nil when it has no room."
               (let ((inhibit-read-only t)
                     (inhibit-modification-hooks t))
                 (erase-buffer)
-                (insert text)))))))))
+                (insert text))
+              (my/status--fit-echo-area))))))))
+
+(defun my/status--fit-echo-area ()
+  "Make the echo area as tall as the bar.
+Resizing the frame, as when entering full screen, gives the echo area
+back its height of one line, which cuts off the bar's spacing."
+  (let* ((window (minibuffer-window))
+         (height (cdr (window-text-pixel-size window))))
+    (when (and (> height 0) (/= height (window-pixel-height window)))
+      (window--resize-mini-window window (- height (window-pixel-height window))))))
+
+(defun my/status--resized (_frame)
+  "Redraw the bar for the frame's new size."
+  (setq my/status--last nil)
+  (my/status-update))
 
 (defun my/status--after-minibuffer ()
   "Redraw the bar once the minibuffer has closed."
@@ -380,6 +395,7 @@ Errors are written into the echo area directly, without
         (add-hook 'post-command-hook #'my/status-update 90)
         (add-hook 'window-selection-change-functions #'my/status-update)
         (add-hook 'window-buffer-change-functions #'my/status-update)
+        (add-hook 'window-size-change-functions #'my/status--resized)
         (add-hook 'minibuffer-exit-hook #'my/status--after-minibuffer)
         (setq my/status--timer (run-with-timer 1 1 #'my/status-update))
         (my/status-update))
@@ -398,6 +414,7 @@ Errors are written into the echo area directly, without
     (remove-hook 'post-command-hook #'my/status-update)
     (remove-hook 'window-selection-change-functions #'my/status-update)
     (remove-hook 'window-buffer-change-functions #'my/status-update)
+    (remove-hook 'window-size-change-functions #'my/status--resized)
     (remove-hook 'minibuffer-exit-hook #'my/status--after-minibuffer)
     (with-current-buffer (get-buffer-create " *Minibuf-0*")
       (let ((inhibit-read-only t)) (erase-buffer)))

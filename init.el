@@ -67,6 +67,9 @@
 ;; Windows as rounded cards on a gray canvas, after the theme it repaints.
 (require 'init-islands)
 (my/islands-mode 1)
+;; One status bar in the echo area, under the cards; mode lines keep their edge.
+(require 'init-status)
+(my/status-mode 1)
 (require 'init-jieba-word)
 (require 'init-lsp)
 (require 'init-search)

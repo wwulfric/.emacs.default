@@ -137,12 +137,13 @@ another card rather than the frame's left or right edge."
          (= (nth side edges) (nth side area))
          (/= (nth side edges) (nth side (window-pixel-edges (frame-root-window frame)))))))
 
-(defun my/islands--canvas-space (width)
-  "Return a space WIDTH pixels wide in the canvas color."
+(defun my/islands--canvas-space (width &optional size)
+  "Return a space WIDTH pixels wide in the canvas color.
+SIZE, a list such as (:height (6) :ascent 75), sets its height."
   (when (> width 0)
     (propertize " " 'face `(:background ,(my/islands--canvas)
                             :box nil :overline nil :underline nil)
-                'display `(space :width (,width)))))
+                'display `(space :width (,width) ,@size))))
 
 (defun my/islands--corner (row right)
   "Return the left end, or with RIGHT the right end, of ROW.
@@ -151,10 +152,14 @@ the mode line holds the bottom corners.  An end is a corner image where
 the window's corner is an outer one, else nothing."
   (when (display-graphic-p)
     (let* ((top (not (eq row 'mode-line)))
+           ;; A mode line of a fixed height holds no text to set it, so
+           ;; the spaces here must not make it as tall as their font.
+           (fixed (and (not top) my/ui-mode-line-pixels))
+           (size (and fixed `(:height (,fixed) :ascent 75)))
            (height (pcase row
                      ('tab-line (window-tab-line-height))
                      ('header-line (window-header-line-height))
-                     (_ (window-mode-line-height))))
+                     (_ (or fixed (window-mode-line-height)))))
            (insets (my/islands--insets))
            (inset (if right (cdr insets) (car insets)))
            (image (and (> height 0) (my/islands--outer-p top right)
@@ -170,9 +175,12 @@ the window's corner is an outer one, else nothing."
       (if right
           (concat (propertize " " 'display
                               `(space :align-to (- (+ right right-fringe right-margin)
-                                                   (,(+ inset (if image my/islands-radius 0))))))
-                  image (my/islands--canvas-space inset))
-        (concat (my/islands--canvas-space inset) image)))))
+                                                   (,(+ inset (if image my/islands-radius 0))))
+                                     ,@size)
+                              ;; Without text, the line's rules go too.
+                              'face (and fixed '(:box nil :overline nil :underline nil)))
+                  image (my/islands--canvas-space inset size))
+        (concat (my/islands--canvas-space inset size) image)))))
 
 (defun my/islands--wrap (format row)
   "Return mode-line construct FORMAT between the corners of ROW."

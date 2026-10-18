@@ -16,6 +16,12 @@
 A number, or a function returning one for the window being drawn.
 Rounded window corners (init-islands.el) are drawn there.")
 
+(defvar my/ui-mode-line-pixels nil
+  "Pixel height of mode lines in graphical frames, or nil.
+Nil lets their text decide it.  A number means they hold no text, only
+the bottom edge of a window (init-status.el); what is drawn in them, such
+as rounded corners (init-islands.el), takes this height.")
+
 (defun my/ui-line-end-inset ()
   "Return the pixels kept free at the right end of this window's lines."
   (if (functionp my/ui-line-end-inset)

@@ -126,8 +126,7 @@
    `(my/welcome-meta ((t (:foreground ,comment))))
    `(my/welcome-pin ((t (:foreground ,amber))))
    `(my/welcome-unavailable ((t (:foreground ,border :slant italic))))
-   `(my/welcome-key ((t (:inherit fixed-pitch :foreground ,accent :background ,surface
-                                  :box (:line-width (1 . -1) :color ,section-rule)))))
+   `(my/welcome-key ((t (:inherit fixed-pitch :foreground ,structure))))
    `(my/welcome-hint ((t (:foreground ,muted))))
    `(my/welcome-row ((t (:background ,selection))))
    ;; Completion and Chinese input popups: white with a hairline, like the

@@ -88,6 +88,10 @@ directory rows taller and renders wider than Emacs measures."
 (with-eval-after-load 'dirvish-subtree
   ;; The ▸/▾ strings only mark the state; the advice draws chevrons.
   (customize-set-variable 'dirvish-subtree-state-style 'arrow)
+  ;; As in the New UI, indentation alone shows depth; no guide lines.
+  ;; Set it globally: the sidebar expands to the opened file before
+  ;; `my/dirvish-setup' could set a buffer-local prefix.
+  (customize-set-variable 'dirvish-subtree-prefix "  ")
   (advice-add 'dirvish-attribute-subtree-state-rd :filter-return
               #'my/dirvish-align-subtree-state))
 
@@ -435,7 +439,6 @@ Outside the sidebar, preserve Dired's usual mouse behavior."
       (setq my/dirvish-font-face-cookie
             (face-remap-add-relative 'default 'my/dirvish-file-name)))
     (setq-local line-spacing 0.2)
-    (setq-local dirvish-subtree-prefix "  │")
     ;; The sidebar already has its project header; its internal buffer is no tab.
     (setq-local tab-line-exclude t)
     (when (bound-and-true-p tab-line-mode) (tab-line-mode -1))

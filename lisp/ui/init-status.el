@@ -4,12 +4,12 @@
 ;; As in JetBrains IDEs, one bar along the frame's bottom edge tells about
 ;; the window being edited, instead of a mode line under each window:
 ;;
-;;   ☰  Haxl › Core › Monad.hs  ●     Saved     E3 W2  287:12  LF  UTF-8  🔓  Haskell
+;;   ☰  Haxl › Core › Monad.hs  ●       Saved       E3 W2  287:12  LF  UTF-8  🔓
 ;;
 ;; At the left the mode menu (frame-setting.el), the file's place in its
 ;; project and its state; in the middle the last message; at the right
-;; diagnostics, position, line ends, encoding, a lock toggling read-only,
-;; and mode; as in JetBrains, the title bar names the project and branch.
+;; diagnostics, position, line ends, encoding and a lock toggling
+;; read-only; as in JetBrains, the title bar names the project and branch.
 ;; Like awesome-tray, the bar is the text of the idle echo area, whose
 ;; minibuffer opens in a floating panel (init-palette.el); it sits on the
 ;; canvas below the cards (init-islands.el).  Messages are drawn in the bar
@@ -258,9 +258,7 @@ of their own that closing the tab would leave behind."
                      (propertize position 'face 'my/status)
                      (propertize (car encoding) 'face 'my/status-muted)
                      (propertize (cadr encoding) 'face 'my/status-muted)
-                     (my/status--lock)
-                     (propertize (format-mode-line mode-name nil window)
-                                 'face 'my/status)))
+                     (my/status--lock)))
      (my/ui-space my/status-gap))))
 
 (defun my/status--lock ()

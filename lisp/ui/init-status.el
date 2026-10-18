@@ -99,7 +99,7 @@ window used most recently."
 (defconst my/status--stray-mouse
   '([drag-mouse-1] [double-down-mouse-1] [double-mouse-1] [double-drag-mouse-1]
     [triple-down-mouse-1] [triple-mouse-1] [triple-drag-mouse-1])
-  "Mouse events the bar ignores, all but a click.
+  "Mouse events the bar ignores outside its items.
 A click clears the message and so rewrites the bar under the mouse, which
 makes Emacs see the release as a drag.  Unbound, it would reach
 `mouse-set-region', which refuses the inactive minibuffer window.")
@@ -117,16 +117,14 @@ Other mouse events, the release included, do nothing.")
 
 (defun my/status--set-mouse (enable)
   "Make the idle echo area ignore stray mouse events when ENABLE, else restore.
-A click there shows the messages with `my/status-messages'."
+Only the bar's items respond to the mouse; Emacs would otherwise show the
+messages on a click anywhere in it."
   (if enable
       (unless my/status--saved-mouse
         (dolist (key (cons [mouse-1] my/status--stray-mouse))
           (push (cons key (lookup-key minibuffer-inactive-mode-map key))
                 my/status--saved-mouse)
-          (define-key minibuffer-inactive-mode-map key
-            ;; A click outside the items shows the messages too, as it
-            ;; does in Emacs, but in a tab.
-            (if (equal key [mouse-1]) #'my/status-messages #'ignore))))
+          (define-key minibuffer-inactive-mode-map key #'ignore)))
     (dolist (binding my/status--saved-mouse)
       (define-key minibuffer-inactive-mode-map (car binding) (cdr binding)))
     (setq my/status--saved-mouse nil)))

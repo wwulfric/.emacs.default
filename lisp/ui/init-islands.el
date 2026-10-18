@@ -24,6 +24,7 @@
 (eval-when-compile (require 'dirvish nil t))
 
 (defvar my/islands-mode)
+(defvar my/ui-header-ascent)
 
 (defgroup my/islands nil "Windows as rounded islands." :group 'convenience)
 
@@ -149,7 +150,8 @@ SIZE, a list such as (:height (6) :ascent 75), sets its height."
   "Return the left end, or with RIGHT the right end, of ROW.
 ROW is `tab-line', `header-line' or `mode-line' of the window being drawn;
 the mode line holds the bottom corners.  An end is a corner image where
-the window's corner is an outer one, else nothing."
+the window's corner is an outer one; elsewhere a top row keeps the
+corner's width blank, and a mode line nothing."
   (when (display-graphic-p)
     (let* ((top (not (eq row 'mode-line)))
            ;; A mode line of a fixed height holds no text to set it, so
@@ -171,16 +173,22 @@ the window's corner is an outer one, else nothing."
                                                      (if right "right" "left")))
                                      my/islands-radius height
                                      (my/islands--card)
-                                     (my/islands--canvas) nil 75))))
+                                     (my/islands--canvas) nil
+                                     (if top my/ui-header-ascent 75))))
+           ;; A top row's rule stops a corner's width short of either end,
+           ;; rounded or not, so the rules of all cards line up.
+           (end (or image
+                    (and top (propertize " " 'face '(:box nil :overline nil :underline nil)
+                                         'display `(space :width (,my/islands-radius)))))))
       (if right
           (concat (propertize " " 'display
                               `(space :align-to (- (+ right right-fringe right-margin)
-                                                   (,(+ inset (if image my/islands-radius 0))))
+                                                   (,(+ inset (if end my/islands-radius 0))))
                                      ,@size)
                               ;; Without text, the line's rules go too.
                               'face (and fixed '(:box nil :overline nil :underline nil)))
-                  image (my/islands--canvas-space inset size))
-        (concat (my/islands--canvas-space inset size) image)))))
+                  end (my/islands--canvas-space inset size))
+        (concat (my/islands--canvas-space inset size) end)))))
 
 (defun my/islands--wrap (format row)
   "Return mode-line construct FORMAT between the corners of ROW."

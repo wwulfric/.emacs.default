@@ -4,12 +4,13 @@
 ;; As in JetBrains IDEs, one bar along the frame's bottom edge tells about
 ;; the window being edited, instead of a mode line under each window:
 ;;
-;;   ☰  Haxl › Haxl › Core › Monad.hs  ●     Saved      E3 W2  ⎇ main  287:12  LF  UTF-8  Haskell
+;;   ☰  Haxl › Core › Monad.hs  ●       Saved       E3 W2  287:12  LF  UTF-8  Haskell
 ;;
 ;; At the left the mode menu (frame-setting.el), the file's place in its
 ;; project and its state; in the middle the last message; at the right
-;; diagnostics, branch, position, line ends, encoding and mode.  Like
-;; awesome-tray, the bar is the text of the idle echo area, whose minibuffer
+;; diagnostics, position, line ends, encoding and mode; as in JetBrains, the
+;; title bar names the project and branch.  Like awesome-tray, the bar is
+;; the text of the idle echo area, whose minibuffer
 ;; opens in a floating panel (init-palette.el); it sits on the canvas below
 ;; the cards (init-islands.el).  Messages are drawn in the bar rather than
 ;; replacing it; a long one is cut short, and a click shows them all.
@@ -153,7 +154,8 @@ messages on a click anywhere in it."
   (cdr my/status--root))
 
 (defun my/status--path ()
-  "Return the current buffer's place: project › folders › file name."
+  "Return the current buffer's place in its project: folders › file name.
+The title bar names the project and its branch (init-frame-title.el)."
   (let* ((file (or buffer-file-name
                    (and (derived-mode-p 'dired-mode) default-directory)))
          (root (and file (my/status--project-root)))
@@ -169,15 +171,12 @@ messages on a click anywhere in it."
         ;; Long paths keep their first and last two folders.
         (when (> (length folders) 4)
           (setq folders (append (list (car folders) "…") (last folders 2))))
-        (concat (when root
-                  (concat (propertize (file-name-nondirectory
-                                       (directory-file-name root))
-                                      'face 'my/status-muted)
-                          separator))
-                (mapconcat (lambda (folder) (propertize folder 'face 'my/status-muted))
+        (concat (mapconcat (lambda (folder) (propertize folder 'face 'my/status-muted))
                            folders separator)
                 (when folders separator)
-                (propertize (or name relative) 'face 'my/status))))))
+                (propertize (or name (file-name-nondirectory
+                                      (directory-file-name file)))
+                            'face 'my/status))))))
 
 (defun my/status--flags ()
   "Return the current buffer's state: modified, read-only, recording..."
@@ -192,26 +191,6 @@ messages on a click anywhere in it."
                              "Numbering")))))
     (when flags
       (propertize (string-join flags " · ") 'face 'my/status-muted))))
-
-(defvar-local my/status--branch nil
-  "Git branch of this buffer's project as (TIME . NAME), cached.")
-
-(defun my/status--branch ()
-  "Return the Git branch of the current buffer's project, or nil.
-Read from .git/HEAD at most every few seconds, without running Git."
-  (when-let* ((root (my/status--project-root))
-              ((or (not my/status--branch)
-                   (> (- (float-time) (car my/status--branch)) 5))))
-    (let ((head (expand-file-name ".git/HEAD" root)))
-      (setq my/status--branch
-            (cons (float-time)
-                  (when (file-regular-p head)
-                    (with-temp-buffer
-                      (insert-file-contents head)
-                      (if (re-search-forward "ref: refs/heads/\\(.+\\)" nil t)
-                          (match-string 1)
-                        (buffer-substring 1 (min 8 (point-max))))))))))
-  (cdr my/status--branch))
 
 (defun my/status--encoding ()
   "Return the current buffer's line ends and encoding, such as (\"LF\" \"UTF-8\")."
@@ -263,7 +242,6 @@ of their own that closing the tab would leave behind."
   (let* ((point (window-point window))
          (position (format "%d:%d" (line-number-at-pos point)
                            (1+ (save-excursion (goto-char point) (current-column)))))
-         (branch (my/status--branch))
          (encoding (my/status--encoding))
          (diagnostics (and (bound-and-true-p lsp-bridge-mode)
                            (bound-and-true-p my/ui-diagnostic-summary))))
@@ -271,7 +249,6 @@ of their own that closing the tab would leave behind."
      (delq nil (list (and diagnostics
                           (my/status--item diagnostics #'my/status-diagnostics
                                            "List diagnostics"))
-                     (and branch (propertize (concat "⎇ " branch) 'face 'my/status))
                      (propertize position 'face 'my/status)
                      (propertize (car encoding) 'face 'my/status-muted)
                      (propertize (cadr encoding) 'face 'my/status-muted)
@@ -405,7 +382,7 @@ Errors are written into the echo area directly, without
                   truncate-lines t))))
 
 (defvar my/status--timer nil
-  "Timer refreshing what changes without a command: diagnostics, branch.")
+  "Timer refreshing what changes without a command, such as diagnostics.")
 
 (define-minor-mode my/status-mode
   "Show one status bar along the bottom of graphical frames."

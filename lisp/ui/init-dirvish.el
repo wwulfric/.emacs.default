@@ -210,7 +210,7 @@ ACTION runs in the clicked sidebar; see `my/dirvish-side-buttons'."
                my/dirvish-side-buttons "")))
 
 (defun my/dirvish-side-header ()
-  "Return the sidebar's project title, and its toolbar while in use.
+  "Return the sidebar's view title, and its toolbar while in use.
 As in a New UI tool window, the toolbar shows when focused or hovered."
   (let* ((toolbar (when (my/dirvish-side-active-p)
                     (concat (my/dirvish-side-toolbar)
@@ -220,14 +220,9 @@ As in a New UI tool window, the toolbar shows when focused or hovered."
          (chevron (concat (propertize " " 'display '(space :width (2)))
                           (expui-icons-icon "general/chevronDown"
                                             :face 'my/dirvish-neutral-icon)))
-         ;; Mode-line formatting would read a % in the name as a construct.
-         (name (propertize
-                (string-replace
-                 "%" "%%" (concat " " (file-name-nondirectory
-                                        (directory-file-name
-                                         (or (dirvish--vc-root-dir)
-                                             default-directory)))))
-                'face 'my/dirvish-project-title))
+         ;; As in JetBrains, the title bar names the project; this is the
+         ;; Project view, whose menu switches between projects.
+         (name (propertize " Project" 'face 'my/dirvish-project-title))
          ;; Shorten the title rather than let the window clip the toolbar.
          (room (- (window-body-width nil t) toolbar-width
                   (string-pixel-width chevron) 8 (my/ui-line-end-inset))))

@@ -90,7 +90,7 @@
    '(mode-line-buffer-id ((t (:weight bold))))
    `(header-line ((t (:inherit fixed-pitch :background ,surface :foreground ,fg :box nil :overline nil :underline nil))))
    ;; Page-header tabs: one continuous rule, with color marking selection.
-   `(tab-line ((t (:inherit fixed-pitch :height 1.0 :box nil :weight normal
+   `(tab-line ((t (:inherit my/ui-font :height 1.0 :box nil :weight normal
                    :overline nil :underline (:color ,section-rule :position t)
                    :foreground ,muted :background ,bg))))
    `(tab-line-tab ((t (:inherit tab-line :foreground ,structure :background ,bg

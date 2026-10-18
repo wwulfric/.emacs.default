@@ -99,12 +99,17 @@ use it; code, keys and line numbers there stay in the code font."
 (scroll-bar-mode -1)
 
 ;; Shared header metrics for buffer tabs and the Dirvish sidebar.
-(defvar my/ui-header-height 1.4
-  "Shared height of buffer tabs and the Dirvish sidebar title, in font units.")
+(defvar my/ui-header-height 1.9
+  "Shared height of buffer tabs and the Dirvish sidebar title, in font units.
+It leaves padding above and below their text.")
+
+(defvar my/ui-header-ascent 68
+  "Percentage of the header height above the text's baseline.
+It centers the interface font's text in the header's height.")
 
 (defun my/ui-header-space (width)
   "Return a spacer display specification with WIDTH and shared header height."
-  `(space :width ,width :height ,my/ui-header-height :ascent 75))
+  `(space :width ,width :height ,my/ui-header-height :ascent ,my/ui-header-ascent))
 
 (defvar my/ui-mode-line-height 1.6
   "Minimum status-bar height in frame character units.")

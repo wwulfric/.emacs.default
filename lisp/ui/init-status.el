@@ -96,14 +96,49 @@ window used most recently."
             (setq best candidate)))
         (or best (frame-first-window))))))
 
+(defconst my/status--stray-mouse
+  '([drag-mouse-1] [double-down-mouse-1] [double-mouse-1] [double-drag-mouse-1]
+    [triple-down-mouse-1] [triple-mouse-1] [triple-drag-mouse-1])
+  "Mouse events the bar ignores, all but a click.
+A click clears the message and so rewrites the bar under the mouse, which
+makes Emacs see the release as a drag.  Unbound, it would reach
+`mouse-set-region', which refuses the inactive minibuffer window.")
+
+(defvar my/status--mouse-map
+  (let ((map (make-sparse-keymap)))
+    (dolist (key (cons [mouse-1] my/status--stray-mouse))
+      (define-key map key #'ignore))
+    map)
+  "Parent keymap of the bar's items, which act on `down-mouse-1'.
+Other mouse events, the release included, do nothing.")
+
+(defvar my/status--saved-mouse nil
+  "Bindings of `minibuffer-inactive-mode-map' replaced by the bar.")
+
+(defun my/status--set-mouse (enable)
+  "Make the idle echo area ignore stray mouse events when ENABLE, else restore.
+A click there shows the messages with `my/status-messages'."
+  (if enable
+      (unless my/status--saved-mouse
+        (dolist (key (cons [mouse-1] my/status--stray-mouse))
+          (push (cons key (lookup-key minibuffer-inactive-mode-map key))
+                my/status--saved-mouse)
+          (define-key minibuffer-inactive-mode-map key
+            ;; A click outside the items shows the messages too, as it
+            ;; does in Emacs, but in a tab.
+            (if (equal key [mouse-1]) #'my/status-messages #'ignore))))
+    (dolist (binding my/status--saved-mouse)
+      (define-key minibuffer-inactive-mode-map (car binding) (cdr binding)))
+    (setq my/status--saved-mouse nil)))
+
 (defun my/status--item (text &optional action help)
   "Return TEXT, running ACTION with the click event when clicked, with HELP."
   (if (not action)
       text
     (let ((map (make-sparse-keymap)))
+      (set-keymap-parent map my/status--mouse-map)
       (define-key map [down-mouse-1] (lambda (event) (interactive "e")
                                        (funcall action event)))
-      (define-key map [mouse-1] #'ignore)
       (propertize text 'keymap map 'mouse-face 'my/status-hover
                   'pointer 'hand 'help-echo help))))
 
@@ -206,8 +241,13 @@ Read from .git/HEAD at most every few seconds, without running Git."
     (call-interactively #'lsp-bridge-diagnostic-list)))
 
 (defun my/status-messages (_event)
-  "Show every message, including those the bar cut short."
-  (view-echo-area-messages))
+  "Show every message, including those the bar cut short.
+They open as a tab of the editor window in use, rather than in a window
+of their own that closing the tab would leave behind."
+  (interactive (list last-input-event))
+  (select-window (my/status--window))
+  (pop-to-buffer-same-window (messages-buffer))
+  (goto-char (point-max)))
 
 ;;;; Bar
 
@@ -334,10 +374,12 @@ usual."
     t))
 
 (defun my/status--clear-message ()
-  "Clear the bar's message, as the next input event clears the echo area."
+  "Clear the bar's message, as the next input event clears the echo area.
+The bar is redrawn once that event is handled: a click on the message
+must still find it under the mouse."
   (when my/status--message
     (setq my/status--message nil)
-    (my/status-update))
+    (run-at-time 0 nil #'my/status-update))
   (clear-minibuffer-message))
 
 (defvar my/status--command-error nil
@@ -375,6 +417,7 @@ Errors are written into the echo area directly, without
   (if my/status-mode
       (progn
         (my/status--prepare-echo-area)
+        (my/status--set-mouse t)
         ;; As tall as the cards' corners, or a one-pixel rule without them.
         (setq my/ui-mode-line-pixels
               (if (bound-and-true-p my/islands-mode) my/islands-radius 1))
@@ -400,6 +443,7 @@ Errors are written into the echo area directly, without
         (setq my/status--timer (run-with-timer 1 1 #'my/status-update))
         (my/status-update))
     (setq my/ui-mode-line-pixels nil)
+    (my/status--set-mouse nil)
     (advice-remove 'my/ui-status-line #'my/status--mode-line)
     (advice-remove 'my/dirvish-side-bars #'my/status--dirvish-bars)
     (setq set-message-functions (remq 'my/status--set-message set-message-functions)

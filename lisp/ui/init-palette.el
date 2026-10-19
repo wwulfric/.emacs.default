@@ -708,6 +708,21 @@ Deferred so that a prompt which directly follows reuses the visible panel."
       (recenter (round (* 0.62 (window-body-height))))
     (recenter)))
 
+(defun my/palette--nested-exit ()
+  "Hide an enclosing panel's echo-area copy again after this minibuffer exits.
+All minibuffers share the echo area's window: one nested in a panel's, and
+not in a panel itself (such as \\[eval-expression]), resizes and scrolls
+it, so the panel's input would show there until the panel next redraws."
+  (when (and (> (minibuffer-depth) 1) (not my/palette--placement))
+    (run-at-time 0 nil #'my/palette--rehide (current-buffer))))
+
+(defun my/palette--rehide (buffer)
+  "Show the panel enclosing BUFFER's minibuffer again, once it has exited.
+The redisplay that follows the exit puts the shared window back at the
+start of the text; let it happen first, or it undoes the hiding."
+  (redisplay t)
+  (my/palette--after-exit buffer))
+
 (define-minor-mode my/palette-mode
   "Show the minibuffer in a floating panel instead of the echo area."
   :global t
@@ -715,6 +730,7 @@ Deferred so that a prompt which directly follows reuses the visible panel."
   (if my/palette-mode
       (progn
         (add-hook 'minibuffer-setup-hook #'my/palette--setup 50)
+        (add-hook 'minibuffer-exit-hook #'my/palette--nested-exit)
         (advice-add 'vertico--display-candidates :after #'my/palette--after-candidates)
         (advice-add 'vertico--resize-window :around #'my/palette--vertico-resize)
         (advice-add 'vertico--display-candidates :filter-args
@@ -730,6 +746,7 @@ Deferred so that a prompt which directly follows reuses the visible panel."
                         (remq #'recenter (remq #'my/palette-recenter
                                                consult-after-jump-hook)))))))
     (remove-hook 'minibuffer-setup-hook #'my/palette--setup)
+    (remove-hook 'minibuffer-exit-hook #'my/palette--nested-exit)
     (advice-remove 'vertico--display-candidates #'my/palette--after-candidates)
     (advice-remove 'vertico--resize-window #'my/palette--vertico-resize)
     (advice-remove 'vertico--display-candidates #'my/palette--divider-args)

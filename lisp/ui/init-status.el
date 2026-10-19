@@ -354,7 +354,18 @@ back its height of one line, which cuts off the bar's spacing."
 (defun my/status--after-minibuffer ()
   "Redraw the bar once the minibuffer has closed."
   (setq my/status--last nil)
-  (run-at-time 0 nil #'my/status-update))
+  (run-at-time 0 nil #'my/status--adopt-message))
+
+(defun my/status--adopt-message ()
+  "Move a message the minibuffer left in the echo area into the bar.
+Messages while it is open, such as the Quit of \\[keyboard-quit], go to the
+echo area, whose one line of text would hold the bar's place until the
+next input.  Then redraw the bar."
+  (when-let* (((not (active-minibuffer-window)))
+              (text (current-message)))
+    (message nil)
+    (message "%s" text))
+  (my/status-update))
 
 ;;;; Messages
 
@@ -395,7 +406,9 @@ Errors are written into the echo area directly, without
 ;;;; Mode
 
 (defun my/status--prepare-echo-area ()
-  "Give the echo area's buffers the bar's height."
+  "Give the echo area's buffers the bar's height.
+The inactive minibuffer's mode resets its local variables each time a
+minibuffer closes, so this runs again then."
   (dolist (name '(" *Minibuf-0*" " *Echo Area 0*" " *Echo Area 1*"))
     (with-current-buffer (get-buffer-create name)
       (setq-local line-spacing my/status-spacing
@@ -412,6 +425,7 @@ Errors are written into the echo area directly, without
   (if my/status-mode
       (progn
         (my/status--prepare-echo-area)
+        (add-hook 'minibuffer-inactive-mode-hook #'my/status--prepare-echo-area)
         (my/status--set-mouse t)
         ;; As tall as the cards' corners, or a one-pixel rule without them.
         (setq my/ui-mode-line-pixels
@@ -455,6 +469,7 @@ Errors are written into the echo area directly, without
     (remove-hook 'window-buffer-change-functions #'my/status-update)
     (remove-hook 'window-size-change-functions #'my/status--resized)
     (remove-hook 'minibuffer-exit-hook #'my/status--after-minibuffer)
+    (remove-hook 'minibuffer-inactive-mode-hook #'my/status--prepare-echo-area)
     (with-current-buffer (get-buffer-create " *Minibuf-0*")
       (let ((inhibit-read-only t)) (erase-buffer)))
     (dolist (name '(" *Minibuf-0*" " *Echo Area 0*" " *Echo Area 1*"))

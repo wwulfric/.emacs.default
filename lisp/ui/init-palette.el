@@ -307,16 +307,23 @@ window."
                                   (my/islands--card)
                                 (face-background 'default (window-frame origin) t)))))
 
+(defvar my/palette--echo-height nil
+  "Height of the echo area, in pixels, recorded before a panel opens.")
+
 (defun my/palette--display ()
-  "Show this minibuffer in its panel and hide the echo-area copy."
+  "Show this minibuffer in its panel and hide the echo-area copy.
+The copy is scrolled out of view; its window keeps the echo area's height,
+so the windows above do not move while the panel is open."
   ;; A click on the panel selects its frame; the panel belongs to the
   ;; editor frame.
   (when-let* ((parent (frame-parent)))
     (select-frame parent t))
   (when-let* ((window (active-minibuffer-window))
               ((eq (window-buffer window) (current-buffer))))
-    (setq-local max-mini-window-height 1)
-    (window-resize window (- (window-pixel-height window)) nil nil 'pixelwise)
+    (setq-local resize-mini-windows nil)
+    (let ((delta (- (or my/palette--echo-height 0) (window-pixel-height window))))
+      (unless (zerop delta)
+        (ignore-errors (window-resize window delta nil nil 'pixelwise))))
     (set-window-vscroll window 100)
     (my/palette--show)))
 
@@ -592,6 +599,8 @@ to the row, which the panel's height counts on."
 
 (defun my/palette--setup ()
   "Decide where this minibuffer appears before it is first displayed."
+  (when (= (minibuffer-depth) 1)
+    (setq my/palette--echo-height (window-pixel-height (minibuffer-window))))
   (setq my/palette--placement
         (and (display-graphic-p)
              (not (memq this-command my/palette-ignore-commands))

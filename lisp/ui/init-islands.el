@@ -238,8 +238,11 @@ at the frame's edge goes, so the card stays white up to it."
             (when my/islands--fringe-cookie
               (face-remap-remove-relative my/islands--fringe-cookie)
               (setq my/islands--fringe-cookie nil)
+              ;; Dirvish's sidebar sets its own; the Dired one uses the frame's.
               (when (derived-mode-p 'dired-mode)
-                (set-window-fringes window (1+ (bound-and-true-p dirvish-window-fringe)) 1)))))))))
+                (if (boundp 'dirvish-window-fringe)
+                    (set-window-fringes window (1+ dirvish-window-fringe) 1)
+                  (set-window-fringes window nil nil))))))))))
 
 (defun my/islands--apply-frame (frame)
   "Give top-level FRAME the canvas background and title bar, or remove them."
@@ -298,6 +301,10 @@ at the frame's edge goes, so the card stays white up to it."
           (when my/islands-mode
             (advice-add 'my/dirvish-side-header :filter-return #'my/islands--header)
             (advice-add 'my/dirvish-side-bars :after #'my/islands--dirvish-bars)))
+        (with-eval-after-load 'init-sidebar
+          (when my/islands-mode
+            (advice-add 'my/sidebar-header :filter-return #'my/islands--header)
+            (advice-add 'my/sidebar-status-line :filter-return #'my/islands--status)))
         (add-hook 'window-state-change-functions #'my/islands--apply-windows)
         (add-hook 'enable-theme-functions #'my/islands--reapply-faces)
         (add-hook 'after-make-frame-functions #'my/islands--apply-frame 90))
@@ -318,6 +325,8 @@ at the frame's edge goes, so the card stays white up to it."
     (advice-remove 'my/ui-status-line #'my/islands--status)
     (advice-remove 'my/dirvish-side-header #'my/islands--header)
     (advice-remove 'my/dirvish-side-bars #'my/islands--dirvish-bars)
+    (advice-remove 'my/sidebar-header #'my/islands--header)
+    (advice-remove 'my/sidebar-status-line #'my/islands--status)
     (remove-hook 'window-state-change-functions #'my/islands--apply-windows)
     (remove-hook 'enable-theme-functions #'my/islands--reapply-faces)
     (remove-hook 'after-make-frame-functions #'my/islands--apply-frame))

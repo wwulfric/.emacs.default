@@ -111,6 +111,13 @@
    `(my/dirvish-project-title ((t (:inherit my/ui-font :foreground ,fg :weight medium))))
    `(my/dirvish-neutral-icon ((t (:foreground ,muted))))
    `(my/dirvish-source-icon ((t (:foreground ,accent))))
+   ;; The Dired sidebar that is replacing Dirvish's (init-sidebar.el).
+   `(my/sidebar-file-name ((t (:inherit my/ui-font :height 1.0))))
+   `(my/sidebar-hl-line ((t (:inherit nil :background ,selection :extend t))))
+   `(my/sidebar-hl-line-inactive ((t (:inherit nil :background ,inactive-selection :extend t))))
+   `(my/sidebar-project-title ((t (:inherit my/ui-font :foreground ,fg :weight medium))))
+   `(my/sidebar-neutral-icon ((t (:foreground ,muted))))
+   `(my/sidebar-source-icon ((t (:foreground ,accent))))
    `(dirvish-subtree-guide ((t (:inherit fixed-pitch :foreground ,section-rule))))
    `(dirvish-subtree-state ((t (:inherit fixed-pitch :foreground ,muted))))
    `(dired-directory ((t (:foreground ,fg :weight bold))))

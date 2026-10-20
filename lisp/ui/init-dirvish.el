@@ -777,5 +777,21 @@ The caller decides what to show for the returned directory."
              window (delq directory-buffer (window-next-buffers window)))))))
     directory))
 
+;;;; Names shared with init-sidebar.el, which replaces this file
+
+(defalias 'my/sidebar-show #'my/dirvish-show)
+(defalias 'my/sidebar-empty-buffer #'my/dirvish-empty-buffer)
+(defalias 'my/sidebar-take-startup-directory #'my/dirvish-take-startup-directory)
+
+(defun my/sidebar-window (&optional frame)
+  "Return FRAME's visible sidebar window, or nil."
+  (with-selected-frame (or frame (selected-frame))
+    (dirvish-side--session-visible-p)))
+
+(defun my/sidebar-hide (&optional frame)
+  "Hide FRAME's sidebar."
+  (when-let* ((window (my/sidebar-window frame)))
+    (with-selected-window window (dirvish-quit))))
+
 (provide 'init-dirvish)
 ;;; init-dirvish.el ends here

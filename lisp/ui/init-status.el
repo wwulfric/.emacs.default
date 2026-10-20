@@ -437,6 +437,10 @@ minibuffer closes, so this runs again then."
           (when my/status-mode
             (advice-add 'my/dirvish-side-bars :after #'my/status--dirvish-bars
                         '((depth . 90)))))
+        (with-eval-after-load 'init-sidebar
+          (when my/status-mode
+            (advice-add 'my/sidebar-status-line :around #'my/status--mode-line
+                        '((depth . 90)))))
         (setq set-message-functions
               (append (remq 'my/status--set-message set-message-functions)
                       '(my/status--set-message))
@@ -455,6 +459,7 @@ minibuffer closes, so this runs again then."
     (my/status--set-mouse nil)
     (advice-remove 'my/ui-status-line #'my/status--mode-line)
     (advice-remove 'my/dirvish-side-bars #'my/status--dirvish-bars)
+    (advice-remove 'my/sidebar-status-line #'my/status--mode-line)
     (setq set-message-functions (remq 'my/status--set-message set-message-functions)
           clear-message-function #'clear-minibuffer-message
           command-error-function (if (eq command-error-function

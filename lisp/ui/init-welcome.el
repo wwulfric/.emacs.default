@@ -413,8 +413,8 @@ descriptions line up; columns are as many as fit, at most three."
     (if (window-prev-buffers)
         (switch-to-prev-buffer)
       (switch-to-buffer (my/workspace-empty-buffer (or root "~/"))))
-    (when (and root (fboundp 'my/dirvish-show))
-      (my/dirvish-show root))))
+    (when (and root (fboundp 'my/sidebar-show))
+      (my/sidebar-show root))))
 
 ;;;; Mode
 

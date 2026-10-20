@@ -55,7 +55,10 @@
 (require 'init-completion)
 (require 'init-palette)
 (require 'init-tab-line)
-(require 'init-dirvish)
+;; The sidebar is moving from Dirvish to plain Dired; switching needs a restart.
+(defvar my/sidebar-use-dired t
+  "Non-nil loads the Dired sidebar (init-sidebar.el) instead of Dirvish's.")
+(require (if my/sidebar-use-dired 'init-sidebar 'init-dirvish))
 (require 'edit-up)
 (require 'init-fingertip)
 (require 'init-treesit)

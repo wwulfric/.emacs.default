@@ -9,7 +9,7 @@
 
 (defface my/ui-font '((t (:family "Helvetica Neue" :weight normal)))
   "Proportional font of interface text, as in an IDE's lists and trees.
-The sidebar (init-dirvish.el) and the minibuffer panel (init-palette.el)
+The sidebar (init-sidebar.el) and the minibuffer panel (init-palette.el)
 use it; code, keys and line numbers there stay in the code font."
   :group 'faces)
 

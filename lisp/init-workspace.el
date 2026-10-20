@@ -19,10 +19,12 @@
 (require 'xref)
 (require 'init-session)
 
-(declare-function my/dirvish-show "init-dirvish")
-(declare-function my/dirvish-empty-buffer "init-dirvish")
-(declare-function dirvish-side--session-visible-p "dirvish-side")
-(declare-function dirvish-quit "dirvish")
+;; init-sidebar.el, or init-dirvish.el while it is being replaced.
+(declare-function my/sidebar-show "init-sidebar")
+(declare-function my/sidebar-empty-buffer "init-sidebar")
+(declare-function my/sidebar-window "init-sidebar")
+(declare-function my/sidebar-hide "init-sidebar")
+(declare-function my/sidebar-take-startup-directory "init-sidebar")
 (declare-function my/welcome-show "init-welcome")
 (declare-function my/frame-title-directory "init-frame-title")
 (defvar my/frame-title-cache)
@@ -291,15 +293,14 @@ START and POINT default to the buffer's own point."
                        (plist-get node :children)))))
 
 (defun my/workspace--sidebar-window (&optional frame)
-  "Return FRAME's visible Dirvish sidebar window."
-  (when (fboundp 'dirvish-side--session-visible-p)
-    (with-selected-frame (or frame (selected-frame))
-      (dirvish-side--session-visible-p))))
+  "Return FRAME's visible sidebar window."
+  (when (fboundp 'my/sidebar-window)
+    (my/sidebar-window frame)))
 
 (defun my/workspace--hide-sidebar (&optional frame)
-  "Hide FRAME's Dirvish sidebar, if any."
-  (when-let* ((window (my/workspace--sidebar-window frame)))
-    (with-selected-window window (dirvish-quit))))
+  "Hide FRAME's sidebar, if any."
+  (when (fboundp 'my/sidebar-hide)
+    (my/sidebar-hide frame)))
 
 (defun my/workspace-branch ()
   "Return the current buffer's branch from the frame-title cache, if known."
@@ -324,7 +325,7 @@ START and POINT default to the buffer's own point."
                                :left (frame-parameter frame 'left)
                                :top (frame-parameter frame 'top)
                                :fullscreen (frame-parameter frame 'fullscreen)))
-                ;; The sidebar's width follows the frame; see init-dirvish.el.
+                ;; The sidebar's width follows the frame; see init-sidebar.el.
                 :sidebar (list :visible (and sidebar t))
                 :layout (my/workspace--capture-window (window-main-window frame) root)
                 :history (my/workspace--capture-history frame root)))))))
@@ -363,8 +364,8 @@ the saved workspace."
 
 (defun my/workspace-empty-buffer (directory)
   "Return an empty editor buffer whose default directory is DIRECTORY."
-  (if (fboundp 'my/dirvish-empty-buffer)
-      (my/dirvish-empty-buffer directory)
+  (if (fboundp 'my/sidebar-empty-buffer)
+      (my/sidebar-empty-buffer directory)
     (let ((buffer (get-scratch-buffer-create)))
       (with-current-buffer buffer
         (setq-local default-directory (file-name-as-directory directory)))
@@ -557,9 +558,9 @@ restores the frame size and position."
     (my/workspace--refresh-tabs)
     (dolist (file (reverse files))
       (switch-to-buffer (find-file-noselect file)))
-    (when (and (fboundp 'my/dirvish-show)
+    (when (and (fboundp 'my/sidebar-show)
                (or (null state) (plist-get sidebar :visible)))
-      (my/dirvish-show root))
+      (my/sidebar-show root))
     (when-let* ((project (project-current nil root)))
       (project-remember-project project))
     (my/workspace-meta-update root :name (my/workspace-root-name root)
@@ -655,8 +656,8 @@ frame's saved size and position."
 A directory argument restores its project.  A file argument restores the
 file's project and selects the file.  Without arguments the start page
 fills the placeholder buffer init.el shows while loading."
-  (let* ((directory (and (fboundp 'my/dirvish-take-startup-directory)
-                         (my/dirvish-take-startup-directory)))
+  (let* ((directory (and (fboundp 'my/sidebar-take-startup-directory)
+                         (my/sidebar-take-startup-directory)))
          (files (delete-dups
                  (delq nil (mapcar (lambda (window)
                                      (buffer-file-name (window-buffer window)))

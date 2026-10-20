@@ -107,7 +107,7 @@
                                       :underline (:color ,green :position t)))))
    `(dirvish-hl-line ((t (:inherit nil :background ,selection :extend t))))
    `(dirvish-hl-line-inactive ((t (:inherit nil :background ,inactive-selection :extend t))))
-   `(my/dirvish-file-name ((t (:inherit my/ui-font :height 0.95))))
+   `(my/dirvish-file-name ((t (:inherit my/ui-font :height 1.0))))
    `(my/dirvish-project-title ((t (:inherit my/ui-font :foreground ,fg :weight medium))))
    `(my/dirvish-neutral-icon ((t (:foreground ,muted))))
    `(my/dirvish-source-icon ((t (:foreground ,accent))))

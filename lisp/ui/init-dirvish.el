@@ -7,6 +7,7 @@
 ;;; Code:
 
 (require 'project)
+(require 'mwheel)
 (require 'dirvish)
 (require 'dirvish-side)
 (require 'expui-icons)
@@ -45,7 +46,8 @@ The status bar is empty: it only continues the editor's along the frame's
 bottom edge.  Dirvish's composer measures each icon as one column, so it
 cannot right-align the header's toolbar."
   (when (eq (dv-type dv) 'side)
-    (setf (dv-mode-line dv) '(:eval (when (display-graphic-p)
+    (setf (dv-size-fixed dv) nil
+          (dv-mode-line dv) '(:eval (when (display-graphic-p)
                                       (my/ui-mode-line-space 0)))
           (dv-header-line dv) '(:eval (my/dirvish-side-header)))))
 ;; Sessions recompose their bars on creation and on every revert.
@@ -58,6 +60,19 @@ cannot right-align the header's toolbar."
 
 (defconst my/dirvish-state-width 16
   "Pixel width of the sidebar's disclosure column, matching the chevrons.")
+
+(defvar my/dirvish-row-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [down-mouse-1] #'my/dirvish-mouse-press)
+    (define-key map [mouse-1] #'my/dirvish-mouse-open)
+    (define-key map [mouse-2] #'my/dirvish-mouse-open)
+    map)
+  "Mouse actions shared by sidebar names, icons and disclosure arrows.")
+
+(defun my/dirvish-clickable (text &optional name)
+  "Give sidebar TEXT a hand pointer, mouse actions and tooltip NAME."
+  (propertize text 'pointer 'hand 'mouse-face nil
+              'local-map my/dirvish-row-map 'help-echo name))
 
 (defun my/dirvish-align-subtree-state (result)
   "Draw RESULT's disclosure state as a New UI chevron of fixed width.
@@ -75,14 +90,18 @@ directory rows taller and renders wider than Emacs measures."
                            (remq 'dirvish-subtree-state row-face)
                          (unless (eq row-face 'dirvish-subtree-state) row-face)))
         (overlay-put ov 'after-string
-                     (propertize " "
-                                 'face (cons 'my/dirvish-neutral-icon
-                                             (ensure-list row-face))
-                                 'display
-                                 (pcase state
-                                   ('expanded (expui-icons-image "general/chevronDown"))
-                                   ('collapsed (expui-icons-image "general/chevronRight"))
-                                   (_ `(space :width (,my/dirvish-state-width)))))))))
+                     (my/dirvish-clickable
+                      (propertize " "
+                                  'face (cons 'my/dirvish-neutral-icon
+                                              (ensure-list row-face))
+                                  'display
+                                  (pcase state
+                                    ('expanded (expui-icons-image "general/chevronDown"))
+                                    ('collapsed (expui-icons-image "general/chevronRight"))
+                                    (_ `(space :width (,my/dirvish-state-width)))))
+                      (save-excursion
+                        (goto-char (overlay-end ov))
+                        (dired-get-filename 'no-dir t)))))))
   result)
 
 (with-eval-after-load 'dirvish-subtree
@@ -96,7 +115,7 @@ directory rows taller and renders wider than Emacs measures."
               #'my/dirvish-align-subtree-state))
 
 (defface my/dirvish-file-name
-  '((t (:inherit my/ui-font :height 0.95)))
+  '((t (:inherit my/ui-font :height 1.0)))
   "Proportional sidebar text." :group 'dirvish)
 (defface my/dirvish-project-title '((t (:inherit default)))
   "Sidebar project title." :group 'dirvish)
@@ -122,12 +141,83 @@ directory rows taller and renders wider than Emacs measures."
          (ov (make-overlay (1- f-beg) f-beg)))
     ;; On the selected row the highlight supplies only the background.
     (overlay-put ov 'after-string
-                 (concat (expui-icons-icon name :face (if hl-face
+                 (my/dirvish-clickable
+                  (concat (expui-icons-icon name :face (if hl-face
                                                           (list face hl-face)
                                                         face))
                          (propertize " " 'display '(space :width (6))
-                                     'face hl-face)))
+                                     'face hl-face)) f-str))
     `(ov . ,ov)))
+
+(defvar-local my/dirvish-name-cache nil)
+(defvar-local my/dirvish-name-metrics nil)
+
+(defun my/dirvish-fit-name (name depth)
+  "Fit NAME at subtree DEPTH, reusing pixel measurements while scrolling."
+  (let ((context (list (window-body-width nil t)
+                       (copy-tree face-remapping-alist)
+                       (face-attribute 'default :font)
+                       (face-attribute 'my/dirvish-file-name :height)
+                       expui-icons-height dirvish-subtree-prefix)))
+    (unless (equal context (car my/dirvish-name-metrics))
+      (setq my/dirvish-name-metrics
+            (list context
+                  (string-pixel-width
+                   (propertize dirvish-subtree-prefix 'face 'dirvish-subtree-guide))
+                  (string-pixel-width "  "))
+            my/dirvish-name-cache (make-hash-table :test #'equal)))
+    (let ((key (cons name depth)))
+      (or (gethash key my/dirvish-name-cache)
+          (let* ((width (max 0 (- (car context)
+                                 (* depth (nth 1 my/dirvish-name-metrics))
+                                 my/dirvish-state-width expui-icons-height 6
+                                 (nth 2 my/dirvish-name-metrics) 12)))
+                 (text (truncate-string-pixelwise name width (current-buffer) "…")))
+            (when (> (hash-table-count my/dirvish-name-cache) 2048)
+              (clrhash my/dirvish-name-cache))
+            (puthash key text my/dirvish-name-cache))))))
+
+(dirvish-define-attribute my-sidebar-name
+  "Fit proportional filenames inside the sidebar before native clipping."
+  :when (display-graphic-p)
+  (let* ((depth (save-excursion
+                  (goto-char f-beg)
+                  (dirvish-subtree--depth)))
+         (text (my/dirvish-fit-name f-str depth))
+         (ov (make-overlay f-beg f-end)))
+    ;; Tooltip properties must also be on the replacement display string.
+    (unless (equal text f-str)
+      (overlay-put ov 'display (my/dirvish-clickable text f-str)))
+    (overlay-put ov 'pointer 'hand)
+    ;; Suppress Dired's own text hover too; selection owns the row background.
+    (overlay-put ov 'mouse-face '(:inherit nil))
+    (overlay-put ov 'help-echo f-str)
+    `(ov . ,ov)))
+
+(defun my/dirvish-render-if-changed (render window &optional selected)
+  "Call RENDER for WINDOW only when its sidebar rows need updating.
+Pixel scrolling within a row should reuse its icons and measured names."
+  (with-current-buffer (window-buffer window)
+    (if (not (when-let* ((session (dirvish-curr)))
+               (eq (dv-type session) 'side)))
+        (funcall render window selected)
+      (let ((state (list (current-buffer) (buffer-chars-modified-tick)
+                         (window-start window) (window-point window)
+                         (window-body-width window t) (window-body-height window t)
+                         (eq window (or selected (frame-selected-window)))
+                         (copy-tree face-remapping-alist)
+                         (face-attribute 'default :font)
+                         (face-attribute 'my/dirvish-file-name :height)
+                         expui-icons-style expui-icons-height
+                         (face-attribute 'my/dirvish-source-icon :foreground)
+                         (face-attribute 'my/dirvish-neutral-icon :foreground)
+                         (frame-parameter nil 'background-color)
+                         (dirvish-prop :attrs))))
+        (unless (equal state (window-parameter window 'my/dirvish-render-state))
+          (funcall render window selected)
+          (set-window-parameter window 'my/dirvish-render-state state))))))
+
+(advice-add 'dirvish--render-attrs :around #'my/dirvish-render-if-changed)
 
 ;;;; Sidebar header: the toolbar appears only while the sidebar is in use
 
@@ -381,7 +471,7 @@ a New UI tool window's.")
 (advice-add 'dirvish-side-root-window-fn :around #'my/dirvish-side-fit-width)
 
 ;; Selection colors are supplied by ink-theme.el.
-(setq dirvish-side-attributes '(subtree-state my-sidebar-icon)
+(setq dirvish-side-attributes '(subtree-state my-sidebar-icon my-sidebar-name)
       dirvish-side-auto-expand t)
 
 (dirvish-override-dired-mode 1)
@@ -427,6 +517,84 @@ Outside the sidebar, preserve Dired's usual mouse behavior."
 (define-key dirvish-mode-map [mouse-2] #'my/dirvish-mouse-open)
 (define-key dirvish-mode-map [down-mouse-1] #'my/dirvish-mouse-press)
 (define-key dirvish-mode-map [mouse-1] #'my/dirvish-mouse-open)
+;; Islands paints a few fringe pixels beside the one-pixel divider.
+;; Treat that visible gap as part of the resize handle as well.
+(defun my/dirvish-drag-divider (event)
+  "Resize the sidebar using positions from mouse EVENTs, including its fringe."
+  (interactive "e")
+  (let* ((window (posn-window (event-start event)))
+         (x-position
+          (lambda (position)
+            (let ((win (posn-window position)))
+              (+ (car (posn-x-y position))
+                 (if (windowp win) (car (window-inside-pixel-edges win)) 0)))))
+         (last-x (funcall x-position (event-start event)))
+         (track-mouse t)
+         done)
+    (while (not done)
+      (let ((next (read-event)))
+        (cond
+         ((and (mouse-event-p next)
+               (memq (event-basic-type next) '(mouse-movement mouse-1)))
+          (let* ((x (funcall x-position (event-end next)))
+                 (delta (- x last-x)))
+            (unless (zerop delta)
+              (adjust-window-trailing-edge window delta t t)
+              (setq last-x x)
+              ;; `read-event' runs inside this command, before the usual
+              ;; window-change hooks.  Recompose rows and header right now.
+              (dirvish--render-attrs window)
+              (force-mode-line-update t)
+              (redisplay t)))
+          (when (eq (event-basic-type next) 'mouse-1) (setq done t)))
+         (t (setq unread-command-events (cons next unread-command-events)
+                  done t)))))))
+
+(define-key dirvish-mode-map [right-fringe down-mouse-1] #'my/dirvish-drag-divider)
+(define-key dirvish-mode-map [right-divider down-mouse-1] #'my/dirvish-drag-divider)
+(define-key dirvish-mode-map [right-fringe mouse-1] #'ignore)
+(define-key dirvish-mode-map [right-fringe drag-mouse-1] #'ignore)
+
+(defvar-local my/dirvish-scroll-remainder 0)
+
+(defun my/dirvish-scroll (event)
+  "Scroll sidebar rows with EVENT, accumulating small touchpad deltas.
+Avoid repeatedly relaying out SVGs at fractional row offsets."
+  (interactive "e")
+  (let ((window (mwheel-event-window event)))
+    (when (framep window) (setq window (frame-selected-window window)))
+    (if (not (and (window-live-p window)
+                  (with-current-buffer (window-buffer window)
+                    (when-let* ((session (dirvish-curr)))
+                      (eq (dv-type session) 'side)))))
+        (pixel-scroll-precision event)
+      (with-selected-window window
+        (set-window-vscroll window 0 t)
+        (if-let* ((raw-delta (cdr-safe (nth 4 event))))
+            ;; The wheel event already reflects the system's scroll direction;
+            ;; its raw pixel delta does not necessarily use the same sign.
+            (let* ((delta (if (mwheel--is-dir-p down (event-basic-type event))
+                              (- (abs raw-delta)) (abs raw-delta)))
+                   (height (max 1 (line-pixel-height)))
+                   (old my/dirvish-scroll-remainder))
+              (setq my/dirvish-scroll-remainder
+                    (+ delta (if (< (* delta old) 0) 0 old)))
+              (let ((lines (truncate (/ my/dirvish-scroll-remainder
+                                        (float height)))))
+                (unless (zerop lines)
+                  (setq my/dirvish-scroll-remainder
+                        (- my/dirvish-scroll-remainder (* lines height)))
+                  (condition-case nil
+                      (if (> lines 0) (scroll-up lines) (scroll-down (- lines)))
+                    ((beginning-of-buffer end-of-buffer) nil))
+                  (dirvish--render-attrs window))))
+          (let ((mwheel-scroll-amount '(2 ((shift) . 1)))
+                (mwheel-progressive-speed nil))
+            (mwheel-scroll event))
+          (dirvish--render-attrs window))))))
+
+(define-key dirvish-mode-map [remap pixel-scroll-precision] #'my/dirvish-scroll)
+(put 'my/dirvish-scroll 'scroll-command t)
 
 (defun my/dirvish-setup ()
   "Disable line numbers before a directory buffer is first displayed."
@@ -438,7 +606,18 @@ Outside the sidebar, preserve Dired's usual mouse behavior."
     (unless my/dirvish-font-face-cookie
       (setq my/dirvish-font-face-cookie
             (face-remap-add-relative 'default 'my/dirvish-file-name)))
-    (setq-local line-spacing 0.2)
+    ;; Keep rows airy even when the SVG determines their minimum height.
+    (setq-local line-spacing 0.35)
+    (setq my/dirvish-name-cache nil my/dirvish-name-metrics nil)
+    ;; Side windows are initially sized above, but remain draggable afterward.
+    (setq-local window-size-fixed nil)
+    (setq-local scroll-preserve-screen-position nil)
+    ;; Keep direct touchpad pixel scrolling; avoid queued wheel animations.
+    (setq-local pixel-scroll-precision-interpolate-mice nil
+                pixel-scroll-precision-large-scroll-height nil
+                pixel-scroll-precision-use-momentum nil)
+    (dolist (window (get-buffer-window-list (current-buffer) nil t))
+      (set-window-parameter window 'my/dirvish-render-state nil))
     ;; The sidebar already has its project header; its internal buffer is no tab.
     (setq-local tab-line-exclude t)
     (when (bound-and-true-p tab-line-mode) (tab-line-mode -1))

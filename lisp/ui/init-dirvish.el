@@ -573,7 +573,9 @@ Avoid repeatedly relaying out SVGs at fractional row offsets."
         (if-let* ((raw-delta (cdr-safe (nth 4 event))))
             ;; The wheel event already reflects the system's scroll direction;
             ;; its raw pixel delta does not necessarily use the same sign.
-            (let* ((delta (if (mwheel--is-dir-p down (event-basic-type event))
+            ;; Only `wheel-*' events carry a pixel delta; `wheel-up' shows
+            ;; earlier rows, as in `mwheel-scroll'.
+            (let* ((delta (if (eq (event-basic-type event) 'wheel-up)
                               (- (abs raw-delta)) (abs raw-delta)))
                    (height (max 1 (line-pixel-height)))
                    (old my/dirvish-scroll-remainder))
@@ -588,8 +590,8 @@ Avoid repeatedly relaying out SVGs at fractional row offsets."
                       (if (> lines 0) (scroll-up lines) (scroll-down (- lines)))
                     ((beginning-of-buffer end-of-buffer) nil))
                   (dirvish--render-attrs window))))
-          (let ((mwheel-scroll-amount '(2 ((shift) . 1)))
-                (mwheel-progressive-speed nil))
+          (let ((mouse-wheel-scroll-amount '(2 ((shift) . 1)))
+                (mouse-wheel-progressive-speed nil))
             (mwheel-scroll event))
           (dirvish--render-attrs window))))))
 

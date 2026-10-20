@@ -98,10 +98,10 @@ prompt as title.")
 See `my/palette-set-action'.")
 
 (defvar my/palette-ignore-commands
-  '(eval-expression edebug-eval-expression debugger-eval-expression
-    my/welcome-filter)
+  '(my/welcome-filter)
   "Commands whose minibuffer stays in the echo area.
-Expressions keep ElDoc beside them; live filters keep their page in view.")
+Live filters keep their page in view.  Expressions read in a panel show
+ElDoc in its footer (see `my/palette--eldoc-display').")
 
 (defvar my/palette-top 0.12
   "Top edge of the palette as a fraction of the frame height.")
@@ -399,7 +399,7 @@ so the windows above do not move while the panel is open."
   "Return TEXT as the panel's TOP line, or else its bottom one.
 Its corners are rounded and carry the outline's sides around them."
   (let ((face (cond (top my/palette--line-face)
-                    (my/palette--list my/palette--footer-face)
+                    ((my/palette--banded-p) my/palette--footer-face)
                     (t my/palette--edge-face))))
     (if (not (and my/palette--outside (display-graphic-p)))
         text
@@ -437,13 +437,25 @@ It is shortened from the left to WIDTH columns."
     (propertize (my/palette--literal (my/ui-fit-left detail width))
                 'face 'shadow)))
 
+(defun my/palette--banded-p ()
+  "Return non-nil when the panel's bottom line is a footer band, not padding.
+A list always has one; a panel without a list, while it has a status."
+  (or my/palette--list my/palette--status))
+
 (defun my/palette--footer ()
   "Return the bottom line.
 A list's footer tells about the selected candidate, or the picker's status,
-at the left, and names one key at the right.  Without a list it is blank,
-padding the panel."
-  (if (not my/palette--list)
-      " "
+at the left, and names one key at the right.  Without a list it shows the
+status, such as ElDoc's, or else is blank, padding the panel."
+  (cond
+   ((and (not my/palette--list) my/palette--status)
+    (concat (my/ui-space-to my/palette-icon-indent)
+            (my/palette--literal
+             (truncate-string-to-width my/palette--status
+                                       (+ 2 (or (my/palette-text-width) 80)) nil nil "…"))))
+   ((not my/palette--list)
+    " ")
+   (t
     (let* ((action (when my/palette--action
                      (concat (propertize (my/palette--literal (car my/palette--action))
                                          'face 'my/palette-title)
@@ -456,15 +468,36 @@ padding the panel."
               (if my/palette--status
                   (my/palette--literal (my/ui-fit-left my/palette--status room))
                 (my/palette--detail room))
-              (and action (my/palette--at-right action))))))
+              (and action (my/palette--at-right action)))))))
 
 (defun my/palette-set-status (status)
   "Show STATUS at the left of this panel's footer, instead of the detail.
 STATUS tells why a list is empty, for example; nil gives the place back to
 the selected candidate.  Call it in the minibuffer."
   (when my/palette--placement
-    (setq my/palette--status status)
+    (let ((banded (my/palette--banded-p)))
+      (setq my/palette--status status)
+      ;; A panel without a list gains or loses its footer band.
+      (unless (eq (and banded t) (and (my/palette--banded-p) t))
+        (my/palette--remap 'mode-line (if (my/palette--banded-p)
+                                          my/palette--footer-face
+                                        my/palette--edge-face))
+        (my/palette--display)))
     (force-mode-line-update t)))
+
+(defun my/palette--eldoc-display (docs _interactive)
+  "Show the first of ElDoc's DOCS in the panel's footer, or clear it.
+In the echo area ElDoc writes into the mode line of the window above,
+which the frame's single status bar leaves no room for."
+  (my/palette-set-status
+   (when-let* ((doc (car docs)))
+     (let ((text (car (split-string (car doc) "\n")))
+           (thing (plist-get (cdr doc) :thing)))
+       (if thing
+           (concat (propertize (format "%s" thing)
+                               'face (or (plist-get (cdr doc) :face) 'my/palette-title))
+                   ": " text)
+         text)))))
 
 (defun my/palette-set-tabs (tabs)
   "Show TABS, a string, in this panel's header instead of its title.
@@ -613,6 +646,7 @@ to the row, which the panel's height counts on."
                                   (my/palette--symbol-anchor (my/palette--origin)))
           my/palette--list (bound-and-true-p vertico--input)
           my/palette--title (my/palette--title))
+    (setq-local eldoc-display-functions (list #'my/palette--eldoc-display))
     (setq-local vertico-count (alist-get my/palette--placement my/palette-rows)
                 truncate-lines t
                 auto-hscroll-mode 'current-line

@@ -49,8 +49,10 @@
 (defconst my/status-gap 16
   "Pixels between the items of the status bar.")
 
-(defconst my/status-spacing '(0.45 . 0.45)
-  "Space above and below the status bar's text, relative to its height.")
+(defconst my/status-spacing
+  (if (< emacs-major-version 31) 0.9 '(0.45 . 0.45))
+  "Extra spacing relative to the line height of the status bar.
+Emacs 31 splits it above and below; older versions put it all below.")
 
 (defvar my/status--message nil
   "Message shown in the middle of the bar, or nil.")

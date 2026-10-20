@@ -115,8 +115,10 @@ Expressions keep ElDoc beside them; live filters keep their page in view.")
 (defvar my/palette-rows '((palette . 14) (point . 8))
   "Candidates shown by each placement.")
 
-(defvar my/palette-line-spacing '(0.22 . 0.22)
-  "Space above and below each row, relative to the line height.")
+(defvar my/palette-line-spacing
+  (if (< emacs-major-version 31) 0.44 '(0.22 . 0.22))
+  "Extra spacing relative to the line height of each row.
+Emacs 31 splits it above and below; older versions put it all below.")
 
 (defconst my/palette-padding (* 3 my/ui-space-small)
   "Horizontal padding inside the panel, in pixels.")

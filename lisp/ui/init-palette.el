@@ -639,6 +639,14 @@ to the row, which the panel's height counts on."
              (not (memq this-command my/palette-ignore-commands))
              my/palette-placement))
   (when my/palette--placement
+    ;; One panel at a time: an enclosing one comes back when this exits
+    ;; (see `my/palette--after-exit').
+    (when (> (minibuffer-depth) 1)
+      (dolist (buffer (buffer-list))
+        (when (and (not (eq buffer (current-buffer)))
+                   (minibufferp buffer t)
+                   (buffer-local-value 'my/palette--placement buffer))
+          (posframe-hide buffer))))
     (setq my/palette--editor nil
           my/palette--editor (my/palette--origin)
           my/palette--width 0
@@ -723,13 +731,31 @@ Deferred so that a prompt which directly follows reuses the visible panel."
         (my/palette--display)))))
 
 (defun my/palette--refit (buffer)
-  "Show BUFFER's panel again if its minibuffer is still active."
+  "Show BUFFER's panel again if its minibuffer is still active.
+Each fit measures the header and mode lines as the last redisplay drew
+them, and they grow as they gain their spacing and corners; fit again
+until the panel's height settles.  A list's panel also refits whenever
+the list updates, but a panel without one has only this."
   (when (and (minibufferp buffer t)
              (buffer-local-value 'my/palette--placement buffer))
-    ;; Let the header line appear first, so the fit counts it.
-    (redisplay)
-    (with-current-buffer buffer
-      (my/palette--display))))
+    (let ((height nil) (tries 0))
+      (while (and (< tries 4)
+                  (not (eql height (my/palette--frame-height buffer))))
+        (setq height (my/palette--frame-height buffer)
+              tries (1+ tries))
+        ;; Let the header line appear first, so the fit counts it.
+        (redisplay)
+        (with-current-buffer buffer
+          (my/palette--display))))))
+
+(defun my/palette--frame-height (buffer)
+  "Return the pixel height of BUFFER's panel, or nil when it has none."
+  (when-let* ((frame (seq-find (lambda (frame)
+                                 (and (frame-parent frame)
+                                      (eq (window-buffer (frame-root-window frame))
+                                          buffer)))
+                               (frame-list))))
+    (frame-pixel-height frame)))
 
 (defun my/palette-active-placement ()
   "Return the placement of the active minibuffer, or nil."

@@ -152,7 +152,8 @@
    `(vertico-current ((t (:foreground ,accent :background ,selection :extend t))))
    `(vertico-group-title ((t (:foreground ,muted :slant normal :height 0.85))))
    `(vertico-group-separator ((t (:foreground ,section-rule :strike-through t))))
-   `(orderless-match-face-0 ((t (:foreground ,accent :weight bold))))
+   ;; Color alone: a bold glyph is taller and wider, so rows would jump.
+   `(orderless-match-face-0 ((t (:foreground ,accent))))
    '(orderless-match-face-1 ((t (:inherit orderless-match-face-0))))
    '(orderless-match-face-2 ((t (:inherit orderless-match-face-0))))
    '(orderless-match-face-3 ((t (:inherit orderless-match-face-0))))

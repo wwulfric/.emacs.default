@@ -22,12 +22,9 @@
 
 (require 'subr-x)
 (require 'ui-layout)
-;; For Dirvish's session accessors, which are macros.
-(eval-when-compile (require 'dirvish nil t))
 
 (declare-function my/ui-build-mode-menu "frame-setting" ())
 (declare-function my/ui-status-line "frame-setting" ())
-(declare-function my/dirvish-side-bars "init-dirvish" (dv))
 (declare-function project-root "project" (project))
 (declare-function expui-icons-icon "expui-icons" (name &rest props))
 (defvar my/ui-diagnostic-summary)
@@ -76,11 +73,6 @@ Terminal frames get nil."
 (defun my/status--mode-line (status-line)
   "Call STATUS-LINE in terminal frames; graphical ones show the bar instead."
   (if (display-graphic-p) (my/status-edge) (funcall status-line)))
-
-(defun my/status--dirvish-bars (dv &rest _)
-  "Make the status bar of Dirvish side session DV a card edge too."
-  (when (eq (dv-type dv) 'side)
-    (setf (dv-mode-line dv) '(:eval (my/status-edge)))))
 
 ;;;; Items
 
@@ -433,10 +425,6 @@ minibuffer closes, so this runs again then."
         (advice-add 'my/ui-status-line :around #'my/status--mode-line
                     ;; Inside Islands' corners.
                     '((depth . 90)))
-        (with-eval-after-load 'init-dirvish
-          (when my/status-mode
-            (advice-add 'my/dirvish-side-bars :after #'my/status--dirvish-bars
-                        '((depth . 90)))))
         (with-eval-after-load 'init-sidebar
           (when my/status-mode
             (advice-add 'my/sidebar-status-line :around #'my/status--mode-line
@@ -458,7 +446,6 @@ minibuffer closes, so this runs again then."
     (setq my/ui-mode-line-pixels nil)
     (my/status--set-mouse nil)
     (advice-remove 'my/ui-status-line #'my/status--mode-line)
-    (advice-remove 'my/dirvish-side-bars #'my/status--dirvish-bars)
     (advice-remove 'my/sidebar-status-line #'my/status--mode-line)
     (setq set-message-functions (remq 'my/status--set-message set-message-functions)
           clear-message-function #'clear-minibuffer-message

@@ -121,9 +121,9 @@ use it; code, keys and line numbers there stay in the code font."
 (tool-bar-mode -1)
 (scroll-bar-mode -1)
 
-;; Shared header metrics for buffer tabs and the Dirvish sidebar.
+;; Shared header metrics for buffer tabs and the sidebar.
 (defvar my/ui-header-height 1.9
-  "Shared height of buffer tabs and the Dirvish sidebar title, in font units.
+  "Shared height of buffer tabs and the sidebar title, in font units.
 It leaves padding above and below their text.")
 
 (defvar my/ui-header-ascent 68
@@ -139,7 +139,7 @@ It centers the interface font's text in the header's height.")
 
 (defun my/ui-mode-line-space (width)
   "Return a WIDTH-column spacer keeping status bars level across windows."
-  ;; A bare :height scales with the buffer's font, including Dirvish's
+  ;; A bare :height scales with the buffer's font, including the sidebar's
   ;; default-face remapping.  A one-element list specifies absolute pixels
   ;; so every window in this frame gets the same height and baseline.
   ;; Leave enough descent for fallback glyphs such as the menu's ☰; otherwise
@@ -389,18 +389,18 @@ package-owned local mode lines by changing only the default format."
 
 
 
-;; Dirvish owns its compact fringes; editor windows get their own text padding.
+;; Side windows own their fringes; editor windows get their own text padding.
 (fringe-mode '(0 . 0))
 
 (defun my/frame-apply-window-padding (frame)
   "Pad editor text on GUI FRAME independently of sidebars and splits.
 Fringes reserve the same space at exterior and interior edges, so opening
-or closing Dirvish cannot remove or double it.  Tabs stay flush and optional
+or closing the sidebar cannot remove or double it.  Tabs stay flush and optional
 reading margins remain independent."
   (when (and (display-graphic-p frame) (not (frame-parent frame)))
     (dolist (window (window-list frame 'no-minibuffer))
       (with-current-buffer (window-buffer window)
-        ;; Dirvish and other side windows manage their own fringes.
+        ;; The sidebar and other side windows manage their own fringes.
         (unless (or (window-parameter window 'window-side)
                     (derived-mode-p 'dired-mode)
                     (string-prefix-p " " (buffer-name)))

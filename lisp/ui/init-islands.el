@@ -3,7 +3,7 @@
 ;;; Commentary:
 ;; As in JetBrains' Islands theme, the frame is a gray canvas holding white
 ;; cards with rounded corners: the editor area, however it is split, is
-;; one card and each side window (the Dirvish sidebar) another.
+;; one card and each side window (the sidebar) another.
 ;; The canvas is the frame's own background, so the transparent macOS
 ;; title bar above the cards and the echo area below them show it; the
 ;; cards reach the frame's left and right edges, which have no tool strips
@@ -20,8 +20,6 @@
 (require 'ui-layout)
 (require 'face-remap)
 (require 'seq)
-;; For Dirvish's session accessors, which are macros.
-(eval-when-compile (require 'dirvish nil t))
 
 (defvar my/islands-mode)
 (defvar my/ui-header-ascent)
@@ -206,14 +204,6 @@ corner's width blank, and a mode line nothing."
   "Put the window's bottom corners around status line FORMAT."
   (my/islands--wrap format 'mode-line))
 
-(defun my/islands--dirvish-bars (dv &rest _)
-  "Round the bottom of Dirvish side session DV's status bar."
-  (when (and (fboundp 'dv-type) (eq (dv-type dv) 'side))
-    (setf (dv-mode-line dv)
-          `((:eval (my/islands--corner 'mode-line nil))
-            ,(dv-mode-line dv)
-            (:eval (my/islands--corner 'mode-line t))))))
-
 (defvar-local my/islands--fringe-cookie nil
   "Face remapping that paints this side window buffer's fringes on the canvas.")
 
@@ -238,11 +228,9 @@ at the frame's edge goes, so the card stays white up to it."
             (when my/islands--fringe-cookie
               (face-remap-remove-relative my/islands--fringe-cookie)
               (setq my/islands--fringe-cookie nil)
-              ;; Dirvish's sidebar sets its own; the Dired one uses the frame's.
+              ;; The sidebar uses the frame's fringes again.
               (when (derived-mode-p 'dired-mode)
-                (if (boundp 'dirvish-window-fringe)
-                    (set-window-fringes window (1+ dirvish-window-fringe) 1)
-                  (set-window-fringes window nil nil))))))))))
+                (set-window-fringes window nil nil)))))))))
 
 (defun my/islands--apply-frame (frame)
   "Give top-level FRAME the canvas background and title bar, or remove them."
@@ -297,10 +285,6 @@ at the frame's edge goes, so the card stays white up to it."
         (add-hook 'minibuffer-inactive-mode-hook #'my/islands--canvas-fringe)
         (advice-add 'tab-line-format :filter-return #'my/islands--tab-line)
         (advice-add 'my/ui-status-line :filter-return #'my/islands--status)
-        (with-eval-after-load 'init-dirvish
-          (when my/islands-mode
-            (advice-add 'my/dirvish-side-header :filter-return #'my/islands--header)
-            (advice-add 'my/dirvish-side-bars :after #'my/islands--dirvish-bars)))
         (with-eval-after-load 'init-sidebar
           (when my/islands-mode
             (advice-add 'my/sidebar-header :filter-return #'my/islands--header)
@@ -323,8 +307,6 @@ at the frame's edge goes, so the card stays white up to it."
     (remove-hook 'minibuffer-inactive-mode-hook #'my/islands--canvas-fringe)
     (advice-remove 'tab-line-format #'my/islands--tab-line)
     (advice-remove 'my/ui-status-line #'my/islands--status)
-    (advice-remove 'my/dirvish-side-header #'my/islands--header)
-    (advice-remove 'my/dirvish-side-bars #'my/islands--dirvish-bars)
     (advice-remove 'my/sidebar-header #'my/islands--header)
     (advice-remove 'my/sidebar-status-line #'my/islands--status)
     (remove-hook 'window-state-change-functions #'my/islands--apply-windows)

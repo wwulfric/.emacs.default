@@ -51,7 +51,7 @@
 ;; movements. A single character/line step does not become a history entry.
 (defun my/navigation-pre-command ()
   ;; Keep the departure through minibuffer prompts and non-file UIs such
-  ;; as the Dirvish sidebar, until a file is selected again.
+  ;; as the sidebar, until a file is selected again.
   (when (and (not (minibufferp))
              (or buffer-file-name my/navigation-inhibit
                  (memq this-command '(xref-go-back xref-go-forward))))

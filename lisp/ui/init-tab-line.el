@@ -147,7 +147,7 @@ Process buffers can be created without running a major-mode hook."
            'my/tab-line-source)
          nil label)))
     (setq padding (apply #'propertize " " (text-properties-at 0 label)))
-    ;; Share the vertical strut with Dirvish; keep the label font unchanged.
+    ;; Share the vertical strut with the sidebar; keep the label font unchanged.
     (put-text-property 0 1 'display
                        (my/ui-header-space 1.2) padding)
     (concat padding (my/tab-line-icon tab label) label padding)))

@@ -2,8 +2,8 @@
 
 ;;; Commentary:
 ;; The sidebar is an ordinary Dired buffer in a left side window, with
-;; `my/sidebar-mode' on top.  It replaces init-dirvish.el piece by piece;
-;; init.el loads one of the two.
+;; `my/sidebar-mode' on top: folders expand in place, rows show New UI
+;; chevrons and icons, and the header holds a tool window's toolbar.
 ;; Keep project navigation separate from lsp-bridge's language server roots.
 
 ;;; Code:

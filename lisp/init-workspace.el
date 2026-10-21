@@ -19,7 +19,6 @@
 (require 'xref)
 (require 'init-session)
 
-;; init-sidebar.el, or init-dirvish.el while it is being replaced.
 (declare-function my/sidebar-show "init-sidebar")
 (declare-function my/sidebar-empty-buffer "init-sidebar")
 (declare-function my/sidebar-window "init-sidebar")

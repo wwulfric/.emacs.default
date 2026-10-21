@@ -54,7 +54,10 @@
 (defvar-local my/sidebar-font-face-cookie nil)
 (defvar-local my/sidebar-header-face-cookie nil)
 (defvar-local my/sidebar-hl nil
-  "Overlay highlighting the selected row; see Selection below.")
+  "Overlays highlighting the selected rows; see Selection below.")
+(defvar-local my/sidebar-hl-rows nil
+  "Name overlays of the rows last drawn in a selection face.")
+(defvar-local my/sidebar-region-face-cookie nil)
 
 (defun my/sidebar-hide-header ()
   "Hide Dired's directory line; the sidebar's header names the project."
@@ -78,7 +81,19 @@
         (unless my/sidebar-font-face-cookie
           (setq my/sidebar-font-face-cookie
                 (face-remap-add-relative 'default 'my/sidebar-file-name)))
-        (setq-local line-spacing 0.35)
+        ;; Emacs 31 splits the spacing above and below, centering the text;
+        ;; older versions put it all below.
+        (setq-local line-spacing
+                    (if (< emacs-major-version 31) 0.35 '(0.175 . 0.175)))
+        ;; A row a pixel too wide is clipped, never wrapped.
+        (setq-local truncate-lines t)
+        ;; Shortened names end in an ellipsis drawn in their own face.
+        (add-to-invisibility-spec '(my/sidebar-tail . t))
+        (setq-local buffer-display-table
+                    (let ((table (make-display-table)))
+                      (set-display-table-slot table 'selective-display
+                                              (vector (make-glyph-code ?…)))
+                      table))
         ;; The sidebar is no editor buffer, so it gets no tab.
         (setq-local tab-line-exclude t)
         (when (bound-and-true-p tab-line-mode) (tab-line-mode -1))
@@ -104,16 +119,31 @@
                 (face-remap-add-relative 'header-line
                                          :inherit 'tab-line :height 1.0 :box nil)))
         (add-hook 'post-command-hook #'my/sidebar-after-command nil t)
+        ;; A region selects whole rows; see `my/sidebar-select'.
+        (unless my/sidebar-region-face-cookie
+          (setq my/sidebar-region-face-cookie
+                (face-remap-add-relative 'region 'my/sidebar-hl-line)))
+        (add-hook 'activate-mark-hook #'my/sidebar-select nil t)
+        (add-hook 'deactivate-mark-hook #'my/sidebar-select nil t)
         (add-hook 'window-selection-change-functions #'my/sidebar-select nil t))
     (face-remap-reset-base 'dired-directory)
     (when my/sidebar-font-face-cookie
       (face-remap-remove-relative my/sidebar-font-face-cookie)
       (setq my/sidebar-font-face-cookie nil))
     (kill-local-variable 'line-spacing)
+    (kill-local-variable 'truncate-lines)
+    (remove-from-invisibility-spec '(my/sidebar-tail . t))
+    (kill-local-variable 'buffer-display-table)
     (kill-local-variable 'dired-create-empty-file-in-current-directory)
     (setq-local revert-buffer-function #'dired-revert)
     (remove-overlays (point-min) (point-max) 'my/sidebar-row t)
-    (when (overlayp my/sidebar-hl) (delete-overlay my/sidebar-hl))
+    (mapc #'delete-overlay my/sidebar-hl)
+    (setq my/sidebar-hl nil)
+    (when my/sidebar-region-face-cookie
+      (face-remap-remove-relative my/sidebar-region-face-cookie)
+      (setq my/sidebar-region-face-cookie nil))
+    (remove-hook 'activate-mark-hook #'my/sidebar-select t)
+    (remove-hook 'deactivate-mark-hook #'my/sidebar-select t)
     (kill-local-variable 'cursor-type)
     (kill-local-variable 'header-line-format)
     (kill-local-variable 'mode-line-format)
@@ -514,24 +544,30 @@ Source files use the accent in `mono' style."
                                    'my/sidebar-neutral-icon))))
 
 (defun my/sidebar-fit-name (label)
-  "Shorten the name under overlay LABEL to the window, or show it whole."
-  (overlay-put
-   label 'display
-   (when-let* ((width my/sidebar-rows-width)
-               (name (buffer-substring (overlay-start label) (overlay-end label)))
-               (room (max 0 (- width
-                               (* (overlay-get label 'my/sidebar-label) my/sidebar-indent)
-                               my/sidebar-state-width expui-icons-height
-                               my/sidebar-icon-gap
-                               ;; The mark column and the space before the icon.
-                               (my/sidebar-name-width "  ")
-                               my/sidebar-name-margin)))
-               ((> (my/sidebar-name-width name) room)))
-     ;; Tooltip properties must also be on the replacement display string.
-     (my/sidebar-highlight
-      (propertize (truncate-string-pixelwise name room (current-buffer) "…")
-                  'help-echo (substring-no-properties name) 'pointer 'hand)
-      (overlay-get label 'my/sidebar-hl)))))
+  "Hide the end of the name under overlay LABEL if it is too wide.
+The name stays buffer text, so the row keeps the buffer's faces and
+background; an ellipsis replaces the hidden end."
+  (when-let* ((tail (overlay-get label 'my/sidebar-tail)))
+    (delete-overlay tail)
+    (overlay-put label 'my/sidebar-tail nil))
+  (when-let* ((width my/sidebar-rows-width)
+              (name (buffer-substring (overlay-start label) (overlay-end label)))
+              (room (max 0 (- width
+                              (* (overlay-get label 'my/sidebar-label) my/sidebar-indent)
+                              my/sidebar-state-width expui-icons-height
+                              my/sidebar-icon-gap
+                              ;; The mark column and the space before the icon.
+                              (my/sidebar-name-width "  ")
+                              my/sidebar-name-margin)))
+              ((> (my/sidebar-name-width name) room)))
+    (let* ((shown (length (truncate-string-pixelwise
+                           name (max 0 (- room (my/sidebar-name-width "…")))
+                           (current-buffer))))
+           (tail (make-overlay (+ (overlay-start label) shown) (overlay-end label))))
+      (overlay-put tail 'invisible 'my/sidebar-tail)
+      (overlay-put tail 'my/sidebar-row t)
+      (overlay-put tail 'evaporate t)
+      (overlay-put label 'my/sidebar-tail tail))))
 
 (defun my/sidebar-highlight (string face)
   "Return STRING with FACE, a selection face or nil, beneath its own faces.
@@ -552,6 +588,10 @@ Overlay strings do not take the background of the selection overlay."
            (space (make-overlay (1- start) start))
            (label (make-overlay start end))
            (selected (my/sidebar-selected-face start)))
+      ;; No hover face or tooltip: Dired's would repaint the name alone,
+      ;; and a shortened name shows in full instead (see Full names).
+      (with-silent-modifications
+        (remove-text-properties (pos-bol) (pos-eol) '(mouse-face nil help-echo nil)))
       (dolist (overlay (list space label))
         (overlay-put overlay 'my/sidebar-row t)
         (overlay-put overlay 'evaporate t))
@@ -564,14 +604,12 @@ Overlay strings do not take the background of the selection overlay."
                              (my/sidebar-icon name directory-p)
                              (propertize " " 'display
                                          `(space :width (,my/sidebar-icon-gap))))
-                     'help-echo name 'pointer 'hand)
+                     'pointer 'hand)
                     selected))
       (overlay-put label 'my/sidebar-label (my/sidebar-tree-depth))
       (overlay-put label 'my/sidebar-hl selected)
+      (when selected (push label my/sidebar-hl-rows))
       (overlay-put label 'pointer 'hand)
-      ;; Suppress Dired's own hover; selection owns the row background.
-      (overlay-put label 'mouse-face '(:inherit nil))
-      (overlay-put label 'help-echo name)
       (my/sidebar-fit-name label))))
 
 (defun my/sidebar-rows-draw (start end)
@@ -606,8 +644,10 @@ Overlay strings do not take the background of the selection overlay."
 
 ;;;; Selection
 
-;; One overlay highlights the line at point, in a fainter face while
-;; another window is selected.  The cursor itself stays hidden.
+;; Overlays highlight the selected rows, in a fainter face while another
+;; window is selected: the row at point, or every row an active region
+;; touches, since Dired's marking and deletion commands act on the region.
+;; The cursor itself stays hidden.
 
 (defface my/sidebar-hl-line '((t (:inherit highlight :extend t)))
   "Selected sidebar row while the sidebar is in use." :group 'dired)
@@ -616,10 +656,11 @@ Overlay strings do not take the background of the selection overlay."
 
 (defun my/sidebar-selected-face (position)
   "Return the selection face if the row at POSITION is selected, else nil."
-  (when (and (overlayp my/sidebar-hl) (overlay-buffer my/sidebar-hl)
-             (= (overlay-start my/sidebar-hl)
-                (save-excursion (goto-char position) (pos-bol))))
-    (overlay-get my/sidebar-hl 'face)))
+  (let ((line (save-excursion (goto-char position) (pos-bol))))
+    (seq-some (lambda (overlay)
+                (and (overlay-buffer overlay) (= (overlay-start overlay) line)
+                     (overlay-get overlay 'face)))
+              my/sidebar-hl)))
 
 (defun my/sidebar-snap ()
   "Move point from a line without an entry to the nearest entry.
@@ -636,39 +677,202 @@ Below the listing that is the last entry."
         (goto-char line)
         (dired-move-to-filename)))))
 
+(defun my/sidebar-selected-lines (window)
+  "Return the starts of the rows selected in WINDOW, its sidebar's buffer current.
+They are the rows an active region touches in the selected window, else
+the row at WINDOW's point."
+  (if (and (eq window (selected-window)) (region-active-p))
+      (let ((end (region-end))
+            lines)
+        (save-excursion
+          (goto-char (region-beginning))
+          ;; A region ending at a row's start does not select that row.
+          (while (and (< (point) end) (not (eobp)))
+            (push (pos-bol) lines)
+            (forward-line 1)))
+        (nreverse lines))
+    (list (save-excursion
+            (when window (goto-char (window-point window)))
+            (pos-bol)))))
+
 (defun my/sidebar-select (&optional window)
-  "Highlight the row at WINDOW's point, in its sidebar's buffer.
+  "Highlight the selected rows of WINDOW's sidebar.
 WINDOW defaults to a window showing the current buffer."
   (let ((window (or window (get-buffer-window nil t))))
     (with-current-buffer (if window (window-buffer window) (current-buffer))
       (when my/sidebar-mode
         (let* ((face (if (and window (eq window (selected-window)))
                          'my/sidebar-hl-line 'my/sidebar-hl-line-inactive))
-               (line (save-excursion
-                       (when window (goto-char (window-point window)))
-                       (pos-bol)))
-               (old (and (overlayp my/sidebar-hl) (overlay-buffer my/sidebar-hl)
-                         (overlay-start my/sidebar-hl))))
-          (unless (and (eql old line) (eq face (overlay-get my/sidebar-hl 'face)))
-            (unless (overlayp my/sidebar-hl)
-              (setq my/sidebar-hl (make-overlay line line))
-              ;; Above the folders' indentation, which it also highlights.
-              (overlay-put my/sidebar-hl 'priority 100))
-            (move-overlay my/sidebar-hl line (save-excursion (goto-char line) (pos-bol 2)))
-            (overlay-put my/sidebar-hl 'face face)
-            (overlay-put my/sidebar-hl 'line-prefix
-                         (propertize " " 'face face 'display
-                                     `(space :width (,(* (my/sidebar-tree-depth line)
-                                                         my/sidebar-indent)))))
+               (lines (my/sidebar-selected-lines window))
+               (live (seq-filter #'overlay-buffer my/sidebar-hl))
+               (old (mapcar #'overlay-start live))
+               ;; Rows drawn selected, wherever text has since moved them.
+               (drawn (delete-dups
+                       (mapcar (lambda (label)
+                                 (save-excursion (goto-char (overlay-start label)) (pos-bol)))
+                               (seq-filter #'overlay-buffer my/sidebar-hl-rows)))))
+          (unless (and (equal old lines)
+                       (seq-every-p (lambda (overlay) (eq (overlay-get overlay 'face) face))
+                                    live)
+                       (seq-every-p (lambda (line) (memq line lines)) drawn))
+            (mapc #'delete-overlay my/sidebar-hl)
+            (setq my/sidebar-hl
+                  (mapcar (lambda (line)
+                            ;; Front-advance: rows a folder inserts above stay outside.
+                            (let ((overlay (make-overlay
+                                            line (save-excursion (goto-char line) (pos-bol 2))
+                                            nil t)))
+                              ;; Above the folders' indentation, which it also highlights.
+                              (overlay-put overlay 'priority 100)
+                              (overlay-put overlay 'evaporate t)
+                              (overlay-put overlay 'face face)
+                              (overlay-put overlay 'line-prefix
+                                           (propertize " " 'face face 'display
+                                                       `(space :width (,(* (my/sidebar-tree-depth line)
+                                                                           my/sidebar-indent)))))
+                              overlay))
+                          lines))
             ;; Icons and shortened names carry the background themselves.
-            (when (and old (<= old (point-max)))
-              (save-excursion (goto-char old) (my/sidebar-rows-draw (pos-bol) (pos-eol))))
-            (save-excursion (goto-char line) (my/sidebar-rows-draw (pos-bol) (pos-eol)))))))))
+            (setq my/sidebar-hl-rows nil)
+            (save-excursion
+              (dolist (line (delete-dups (append old drawn lines)))
+                (when (<= line (point-max))
+                  (goto-char line)
+                  (my/sidebar-rows-draw (pos-bol) (pos-eol)))))))))))
 
 (defun my/sidebar-after-command ()
   "Keep point on an entry and highlight it, after a command in the sidebar."
   (my/sidebar-snap)
   (my/sidebar-select (selected-window)))
+
+;;;; Full names
+
+;; As in JetBrains, a shortened name shows in full while the mouse rests on
+;; its row: a child frame covers the row with the same text, reaching past
+;; the sidebar's edge.  Clicks and wheel turns on it act on the row.
+
+(require 'posframe)
+
+(defconst my/sidebar-name-buffer " *sidebar-name*"
+  "Buffer of the child frame showing a full name.")
+
+(defvar my/sidebar-name-shown nil
+  "The row whose full name is shown, as (WINDOW LINE KEY), or nil.
+LINE is the row's start; KEY changes when the row is drawn again.")
+
+(defun my/sidebar-name-hide ()
+  "Hide the full name, if one is shown."
+  (when my/sidebar-name-shown
+    (setq my/sidebar-name-shown nil)
+    (posframe-hide my/sidebar-name-buffer)))
+
+(defun my/sidebar-name-label (window position)
+  "Return the shortened name's overlay on WINDOW's row at POSITION, or nil."
+  (with-current-buffer (window-buffer window)
+    (save-excursion
+      (goto-char position)
+      (seq-find (lambda (overlay)
+                  (and (overlay-get overlay 'my/sidebar-label)
+                       (overlay-get overlay 'my/sidebar-tail)))
+                (overlays-in (pos-bol) (pos-eol))))))
+
+(defun my/sidebar-name-click (_event)
+  "Act on the row under the full name, as a click on the row would."
+  (interactive "e")
+  (pcase-let ((`(,window ,line) my/sidebar-name-shown))
+    (my/sidebar-name-hide)
+    (when (window-live-p window)
+      (select-window window)
+      (goto-char line)
+      (when-let* ((file (and (dired-move-to-filename) (dired-get-filename nil t))))
+        (if (file-directory-p file)
+            (my/sidebar-tree-toggle)
+          (my/sidebar-visit))))))
+
+(defun my/sidebar-name-scroll (event)
+  "Scroll the sidebar under the full name with wheel EVENT."
+  (interactive "e")
+  (let ((window (car my/sidebar-name-shown)))
+    (my/sidebar-name-hide)
+    (when (window-live-p window)
+      (let ((start (copy-sequence (event-start event))))
+        (setcar start window)
+        (my/sidebar-scroll (append (list (car event) start) (cddr event)))))))
+
+(defvar my/sidebar-name-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [down-mouse-1] #'ignore)
+    (define-key map [mouse-1] #'my/sidebar-name-click)
+    (define-key map [mouse-2] #'my/sidebar-name-click)
+    (define-key map [wheel-up] #'my/sidebar-name-scroll)
+    (define-key map [wheel-down] #'my/sidebar-name-scroll)
+    map)
+  "Mouse actions on a full name, forwarded to its row.")
+
+(defun my/sidebar-name-show (window label)
+  "Show the full name of overlay LABEL over its row in WINDOW."
+  (let* ((buffer (window-buffer window))
+         (line (with-current-buffer buffer
+                 (save-excursion (goto-char (overlay-start label)) (pos-bol))))
+         (key (list (overlay-get label 'before-string)
+                    (overlay-start (overlay-get label 'my/sidebar-tail)))))
+    (unless (equal my/sidebar-name-shown (list window line key))
+      (let* ((selected (overlay-get label 'my/sidebar-hl))
+             (spot (posn-x-y (posn-at-point line window)))
+             (edges (window-inside-pixel-edges window))
+             ;; Start at the icon, past the mark column and chevron, as in
+             ;; JetBrains.  Without a border the row simply runs on.
+             (inset (with-current-buffer buffer
+                      (+ (my/sidebar-name-width "  ") my/sidebar-state-width)))
+             (text (with-current-buffer buffer
+                     (concat (substring (overlay-get label 'before-string) 2)
+                             (my/sidebar-highlight
+                              (buffer-substring (overlay-start label) (overlay-end label))
+                              selected)
+                             (propertize " " 'display
+                                         `(space :width (,my/sidebar-icon-gap)))))))
+        (with-current-buffer (get-buffer-create my/sidebar-name-buffer)
+          ;; The sidebar's fonts, card color and row height.
+          (setq-local face-remapping-alist
+                      (copy-tree (buffer-local-value 'face-remapping-alist buffer)))
+          (when selected
+            (face-remap-add-relative 'default :background (face-background selected nil t)))
+          (setq-local line-spacing (buffer-local-value 'line-spacing buffer)))
+        ;; The child frame lies under the pointer; leave the pointer there.
+        (let ((posframe-mouse-banish-function #'ignore))
+          (posframe-show my/sidebar-name-buffer
+                         :string (propertize text 'keymap my/sidebar-name-map
+                                             'pointer 'hand)
+                         :position (cons (+ (nth 0 edges) (car spot) inset)
+                                         (+ (nth 1 edges) (cdr spot)))
+                         :left-fringe 0 :right-fringe 0
+                         :internal-border-width 0
+                         :border-width 0
+                         :lines-truncate t
+                         :accept-focus nil))
+        (setq my/sidebar-name-shown (list window line key))))))
+
+(defun my/sidebar-name-track (position)
+  "Show the full name of the shortened row at mouse POSITION, else hide it.
+POSITION is from `mouse-pixel-position'."
+  (let* ((frame (car position))
+         (child (and my/sidebar-name-shown
+                     (get-buffer-window my/sidebar-name-buffer t)))
+         (posn (and (frame-live-p frame) (cadr position)
+                    (not (frame-parent frame))
+                    (posn-at-x-y (cadr position) (cddr position) frame)))
+         (window (and posn (posn-window posn)))
+         (point (and posn (posn-point posn))))
+    (cond
+     ;; The pointer rests on the full name itself.
+     ((and child (eq frame (window-frame child))))
+     ((and (windowp window) (integerp point) (not (posn-area posn))
+           (eq frame (selected-frame))
+           (buffer-local-value 'my/sidebar-mode (window-buffer window)))
+      (if-let* ((label (my/sidebar-name-label window point)))
+          (my/sidebar-name-show window label)
+        (my/sidebar-name-hide)))
+     (t (my/sidebar-name-hide)))))
 
 ;;;; Header and status bar
 
@@ -704,7 +908,8 @@ WINDOW defaults to a window showing the current buffer."
         (when (window-live-p changed)
           (with-current-buffer (window-buffer changed)
             (force-mode-line-update))))
-      (setq my/sidebar-hovered hovered))))
+      (setq my/sidebar-hovered hovered))
+    (my/sidebar-name-track position)))
 
 (when (timerp my/sidebar-hover-timer)
   (cancel-timer my/sidebar-hover-timer))

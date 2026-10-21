@@ -63,6 +63,29 @@ use it; code, keys and line numbers there stay in the code font."
 (dolist (buffer (buffer-list))
   (with-current-buffer buffer
     (display-line-numbers-mode (if (derived-mode-p 'prog-mode) 1 -1))))
+
+;; Soft wraps follow the code's indentation, without marks in the padding.
+;; Set display options directly so movement keys keep their logical-line behavior.
+(require 'visual-wrap)
+
+(defun my/prog-soft-wrap ()
+  "Wrap code at whitespace and indent continuations by two extra columns."
+  (setq-local truncate-lines nil
+              truncate-partial-width-windows nil
+              word-wrap t
+              visual-wrap-extra-indent 2)
+  ;; Keep other fringe indicators, such as diagnostics and truncation.
+  (setq-local fringe-indicator-alist
+              (cons '(continuation nil nil)
+                    (assq-delete-all 'continuation
+                                     (copy-tree fringe-indicator-alist))))
+  (visual-wrap-prefix-mode 1))
+
+(add-hook 'prog-mode-hook #'my/prog-soft-wrap)
+(dolist (buffer (buffer-list))
+  (with-current-buffer buffer
+    (when (derived-mode-p 'prog-mode)
+      (my/prog-soft-wrap))))
 ;; 列号
 (column-number-mode t)
 

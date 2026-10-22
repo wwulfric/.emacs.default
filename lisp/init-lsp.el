@@ -121,6 +121,12 @@ Otherwise call ORIGINAL with FILENAME, FILEHOST and POSITION to jump."
 (require 'lsp-bridge-jdtls) ;; 根据项目自动生成自定义配置，添加必要的启动参数
 (setq lsp-bridge-enable-auto-import t) ;; 开启自动导入依赖，目前没有code action。补全时可以通过这个导入相应的依赖，建议开启。
 
+;; java / kotlin: IntelliJ's own language server replaces jdtls once
+;; installed with M-x intellij-server-install (it needs an IntelliJ IDEA
+;; Ultimate license, found through Toolbox).
+(setq intellij-server-directory (my/var-file "intellij-server/"))
+(require 'intellij-server-lsp-bridge)
+
 ;; haskell
 (require 'haskell-mode-autoloads)
 (setq lsp-bridge-source-enable t)

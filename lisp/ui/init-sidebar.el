@@ -58,6 +58,8 @@
 (defvar-local my/sidebar-hl-rows nil
   "Name overlays of the rows last drawn in a selection face.")
 (defvar-local my/sidebar-region-face-cookie nil)
+(defvar-local my/sidebar-compact-ends nil
+  "Last folders of the compacted rows listed; see Packages below.")
 
 (defun my/sidebar-hide-header ()
   "Hide Dired's directory line; the sidebar's header names the project."
@@ -89,6 +91,8 @@
         (setq-local truncate-lines t)
         ;; Shortened names end in an ellipsis drawn in their own face.
         (add-to-invisibility-spec '(my/sidebar-tail . t))
+        ;; A JVM type's row hides its file's extension.
+        (add-to-invisibility-spec 'my/sidebar-ext)
         (setq-local buffer-display-table
                     (let ((table (make-display-table)))
                       (set-display-table-slot table 'selective-display
@@ -133,6 +137,7 @@
     (kill-local-variable 'line-spacing)
     (kill-local-variable 'truncate-lines)
     (remove-from-invisibility-spec '(my/sidebar-tail . t))
+    (remove-from-invisibility-spec 'my/sidebar-ext)
     (kill-local-variable 'buffer-display-table)
     (kill-local-variable 'dired-create-empty-file-in-current-directory)
     (setq-local revert-buffer-function #'dired-revert)
@@ -159,6 +164,9 @@
 (defun my/sidebar-readin ()
   "Prepare the lines Dired has just listed."
   (my/sidebar-hide-header)
+  (setq my/sidebar-compact-ends nil)
+  (with-silent-modifications
+    (my/sidebar-compact (point-min) (point-max) default-directory))
   (my/sidebar-rows-draw (point-min) (point-max))
   (my/sidebar-tree-restore)
   (my/sidebar-snap)
@@ -300,7 +308,8 @@ No line there heads a Dired subdirectory."
             (with-silent-modifications
               (insert listing)
               ;; Hideable details and hover faces need a Dired buffer.
-              (dired-insert-set-properties start (point)))
+              (dired-insert-set-properties start (point))
+              (my/sidebar-compact start (point) directory))
             (unless (= start (point))
               ;; Rear-advance keeps a nested listing inserted at the end inside.
               (let ((node (make-overlay start (point) nil nil t)))
@@ -361,9 +370,10 @@ Return the name's position, or nil when FILE is not in the sidebar."
         (catch 'hidden
           (dolist (part (butlast (split-string (substring file (length root)) "/" t)))
             (setq directory (expand-file-name part directory))
+            ;; A compacted row lists only the last folder of its chain.
             (unless (or (my/sidebar-tree-expanded-p directory)
-                        (and (my/sidebar-tree-goto directory)
-                             (ignore-errors (my/sidebar-tree-expand) t)))
+                        (not (my/sidebar-tree-goto directory))
+                        (ignore-errors (my/sidebar-tree-expand) t))
               (throw 'hidden nil)))
           (my/sidebar-tree-goto file))))))
 
@@ -421,7 +431,14 @@ by line, unaware of expanded folders."
           (when (and my/sidebar-mode
                      (or (equal folder (directory-file-name
                                         (expand-file-name default-directory)))
-                         (member folder my/sidebar-tree-dirs)))
+                         (member folder my/sidebar-tree-dirs)
+                         ;; A folder inside a compacted row's chain.
+                         (let ((inside (file-name-as-directory folder)))
+                           (and (string-prefix-p (expand-file-name default-directory)
+                                                 inside)
+                                (seq-some (lambda (dir) (string-prefix-p inside dir))
+                                          (append my/sidebar-tree-dirs
+                                                  my/sidebar-compact-ends))))))
             (when file
               (setq my/sidebar-tree-target (expand-file-name file directory)))
             (unless my/sidebar-tree-pending
@@ -474,6 +491,167 @@ From the sidebar, that is the last editor window's file."
                     (with-current-buffer (window-buffer window) default-directory))))
         (my/sidebar-select window)))))
 
+;;;; Packages
+
+;; As in JetBrains' Project view, folders under a JVM source root are
+;; packages, and a chain of folders that each hold just one folder shows
+;; as one row, `com.github.wolray.seq'.  The row's buffer text is the
+;; chain's path, `com/github/wolray/seq', so Dired and the tree take the
+;; row for the chain's last folder; only its drawing shows dots.
+
+(defcustom my/sidebar-compact 'packages
+  "Which chains of folders holding just one folder show as one row.
+`packages' compacts packages under JVM source roots, as JetBrains'
+Compact Middle Packages does; t compacts any folders but source roots;
+nil lists every folder on a row of its own.  Relist the sidebar with
+\\[revert-buffer] after changing it."
+  :type '(choice (const :tag "Packages" packages)
+                 (const :tag "All folders" t)
+                 (const :tag "None" nil))
+  :group 'dired)
+
+(defconst my/sidebar-root-regexp
+  "\\(?:\\`\\|/\\)src/\\([^/]+\\)/\\(java\\|kotlin\\|groovy\\|scala\\|resources\\)\\'"
+  "Source roots of Maven and Gradle layouts, relative to the sidebar's folder.")
+
+(defconst my/sidebar-package-regexp
+  "\\(?:\\`\\|/\\)src/[^/]+/\\(?:java\\|kotlin\\|groovy\\|scala\\)/."
+  "Files and folders inside a code root, relative to the sidebar's folder.")
+
+(defun my/sidebar-relative (file)
+  "Return FILE relative to the sidebar's folder, or nil outside it.
+Remote folders return nil too: each check would cost a round trip."
+  (let ((root (expand-file-name default-directory)))
+    (and (not (file-remote-p root))
+         (string-prefix-p root file)
+         (substring file (length root)))))
+
+(defun my/sidebar-root-icon (directory)
+  "Return the icon of DIRECTORY if it is a source root, else nil."
+  (when-let* ((relative (my/sidebar-relative directory))
+              ((string-match my/sidebar-root-regexp relative)))
+    (let ((test (string-match-p "[tT]est" (match-string 1 relative))))
+      (if (equal (match-string 2 relative) "resources")
+          (if test "nodes/testResourcesRoot" "nodes/resourcesRoot")
+        (if test "nodes/testRoot" "nodes/sourceRoot")))))
+
+(defun my/sidebar-package-p (file)
+  "Return non-nil if FILE lies inside a code root; a folder there is a package."
+  (when-let* ((relative (my/sidebar-relative file)))
+    (string-match-p my/sidebar-package-regexp relative)))
+
+(defun my/sidebar-folder-icon (directory)
+  "Return the icon of DIRECTORY if it is a root, package or module, else nil."
+  (or (my/sidebar-root-icon directory)
+      (and (my/sidebar-package-p directory) "nodes/package")
+      ;; A Maven or Gradle module.
+      (and (my/sidebar-relative directory)
+           (seq-some (lambda (build) (file-exists-p (expand-file-name build directory)))
+                     '("pom.xml" "build.gradle" "build.gradle.kts"))
+           "nodes/module")))
+
+(defun my/sidebar-compact-chain (directory)
+  "Return the folders DIRECTORY's row also shows, as names in order.
+They are the one folder DIRECTORY holds and nothing else, the one folder
+that holds, and so on; a source root or symbolic link ends the chain."
+  (let (chain done)
+    (while (not done)
+      (let* ((entries (remove ".DS_Store"
+                              (ignore-errors
+                                (directory-files directory nil
+                                                 directory-files-no-dot-files-regexp
+                                                 t 3))))
+             (next (and entries (null (cdr entries))
+                        (expand-file-name (car entries) directory))))
+        (if (and next (file-directory-p next) (not (file-symlink-p next))
+                 (not (my/sidebar-root-icon next)))
+            (progn (push (car entries) chain)
+                   (setq directory next))
+          (setq done t))))
+    (nreverse chain)))
+
+(defun my/sidebar-compact-start-p (directory)
+  "Return non-nil if a row of DIRECTORY may show the folders under it."
+  (pcase my/sidebar-compact
+    ('packages (my/sidebar-package-p directory))
+    ('nil nil)
+    (_ (and (my/sidebar-relative directory)
+            (not (my/sidebar-root-icon directory))))))
+
+(defun my/sidebar-compact (start end directory)
+  "Extend each folder's name from START to END by the chain under it.
+DIRECTORY holds the entries on those lines, none of them expanded yet."
+  (when my/sidebar-compact
+    (let ((end (copy-marker end)))
+      (save-excursion
+        (goto-char start)
+        (while (< (point) end)
+          (when-let* ((name (and (dired-move-to-filename)
+                                 (dired-get-filename 'no-dir t)))
+                      ;; Already compacted, when Dired's readin runs twice.
+                      ((not (string-search "/" name)))
+                      (file (expand-file-name name directory))
+                      ((file-directory-p file))
+                      ((not (file-symlink-p file)))
+                      ((my/sidebar-compact-start-p file))
+                      (chain (my/sidebar-compact-chain file)))
+            (dired-move-to-end-of-filename)
+            (let ((from (point)))
+              (insert-and-inherit (mapconcat (lambda (part) (concat "/" part)) chain))
+              (put-text-property from (point) 'dired-filename t))
+            (push (expand-file-name (string-join chain "/") file)
+                  my/sidebar-compact-ends))
+          (forward-line 1)))
+      (set-marker end nil))))
+
+;; JetBrains shows a Java or Kotlin file that declares a type of its own
+;; name as that type, without the extension.  The declaration follows the
+;; package and imports, so reading the file's start finds it.
+
+(defvar my/sidebar-types (make-hash-table :test #'equal)
+  "Icons of JVM source files, as (MODIFICATION-TIME . ICON) by file.")
+
+(defconst my/sidebar-type-bytes 16384
+  "Bytes of a JVM source file read to find its type.")
+
+(defun my/sidebar-read-type (file)
+  "Return the icon of the type FILE declares under its own name, or nil."
+  (let ((name (file-name-base file))
+        (case-fold-search nil))
+    (with-temp-buffer
+      (ignore-errors
+        (insert-file-contents-literally file nil 0 my/sidebar-type-bytes))
+      (when (re-search-forward
+             (concat "^[ \t]*\\(?:@[[:alnum:]_.]+\\(?:([^)\n]*)\\)?[ \t]+\\)*"
+                     "\\(\\(?:[a-z-]+[ \t]+\\)*\\)"
+                     "\\(class\\|interface\\|enum\\|record\\|object\\|@interface\\)"
+                     "[ \t]+" (regexp-quote name) "\\(?:[^[:alnum:]_$]\\|$\\)")
+             nil t)
+        (let* ((keyword (match-string 2))
+               (modifiers (split-string (match-string 1))))
+          (cond ((or (equal keyword "@interface") (member "annotation" modifiers))
+                 "nodes/annotation")
+                ((or (equal keyword "enum") (member "enum" modifiers)) "nodes/enum")
+                ((equal keyword "interface") "nodes/interface")
+                ((equal keyword "record") "nodes/record")
+                ((string-suffix-p "Exception" name)
+                 (if (member "abstract" modifiers)
+                     "nodes/abstractException" "nodes/exception"))
+                ((member "abstract" modifiers) "nodes/classAbstract")
+                (t "nodes/class")))))))
+
+(defun my/sidebar-type-icon (file)
+  "Return the icon of the type FILE declares if it is JVM source, else nil.
+Each file is read once until it changes."
+  (when (and (member (file-name-extension file) '("java" "kt"))
+             (my/sidebar-package-p file))
+    (let ((time (file-attribute-modification-time (file-attributes file)))
+          (cached (gethash file my/sidebar-types)))
+      (if (and cached (equal (car cached) time))
+          (cdr cached)
+        (cdr (puthash file (cons time (my/sidebar-read-type file))
+                      my/sidebar-types))))))
+
 ;;;; Rows
 
 ;; Each entry's leading space shows its disclosure chevron and icon, and a
@@ -500,7 +678,9 @@ From the sidebar, that is the last editor window's file."
 (defvar my/sidebar-source-icons
   '("xml" "c" "h" "cpp" "Csharp" "java" "kotlin" "kotlinScript" "groovy"
     "language/scala" "language/php" "python" "perl" "javaScript" "typeScript"
-    "swiftLang")
+    "swiftLang" "nodes/sourceRoot" "nodes/testRoot" "nodes/class"
+    "nodes/classAbstract" "nodes/interface" "nodes/enum" "nodes/record"
+    "nodes/annotation" "nodes/exception" "nodes/abstractException")
   "Icons drawn in the accent color when `expui-icons-style' is `mono'.")
 
 (defvar-local my/sidebar-rows-width nil
@@ -535,39 +715,53 @@ DIRECTORY-P says whether the line lists a folder."
                                (_ `(space :width (,my/sidebar-state-width)))))
       (pcase state ('expanded "▾") ('collapsed "▸") (_ " ")))))
 
-(defun my/sidebar-icon (name directory-p)
-  "Return the icon of NAME, a folder if DIRECTORY-P.
-Source files use the accent in `mono' style."
-  (let ((icon (expui-icons-name-for-file name directory-p)))
-    (expui-icons-icon icon :face (if (member icon my/sidebar-source-icons)
-                                     'my/sidebar-source-icon
-                                   'my/sidebar-neutral-icon))))
+(defun my/sidebar-icon (icon)
+  "Return ICON, an icon name; source files use the accent in `mono' style."
+  (expui-icons-icon icon :face (if (member icon my/sidebar-source-icons)
+                                   'my/sidebar-source-icon
+                                 'my/sidebar-neutral-icon)))
 
 (defun my/sidebar-fit-name (label)
   "Hide the end of the name under overlay LABEL if it is too wide.
 The name stays buffer text, so the row keeps the buffer's faces and
-background; an ellipsis replaces the hidden end."
-  (when-let* ((tail (overlay-get label 'my/sidebar-tail)))
-    (delete-overlay tail)
-    (overlay-put label 'my/sidebar-tail nil))
-  (when-let* ((width my/sidebar-rows-width)
-              (name (buffer-substring (overlay-start label) (overlay-end label)))
-              (room (max 0 (- width
-                              (* (overlay-get label 'my/sidebar-label) my/sidebar-indent)
-                              my/sidebar-state-width expui-icons-height
-                              my/sidebar-icon-gap
-                              ;; The mark column and the space before the icon.
-                              (my/sidebar-name-width "  ")
-                              my/sidebar-name-margin)))
-              ((> (my/sidebar-name-width name) room)))
-    (let* ((shown (length (truncate-string-pixelwise
-                           name (max 0 (- room (my/sidebar-name-width "…")))
-                           (current-buffer))))
-           (tail (make-overlay (+ (overlay-start label) shown) (overlay-end label))))
-      (overlay-put tail 'invisible 'my/sidebar-tail)
-      (overlay-put tail 'my/sidebar-row t)
-      (overlay-put tail 'evaporate t)
-      (overlay-put label 'my/sidebar-tail tail))))
+background; an ellipsis replaces the hidden end.  The name drawn is the
+label's `my/sidebar-name', which may leave out an extension."
+  (dolist (key '(my/sidebar-tail my/sidebar-ext))
+    (when-let* ((overlay (overlay-get label key)))
+      (delete-overlay overlay)
+      (overlay-put label key nil)))
+  (let* ((name (overlay-get label 'my/sidebar-name))
+         (start (overlay-start label))
+         (room (when my/sidebar-rows-width
+                 (max 0 (- my/sidebar-rows-width
+                           (* (overlay-get label 'my/sidebar-label) my/sidebar-indent)
+                           my/sidebar-state-width expui-icons-height
+                           my/sidebar-icon-gap
+                           ;; The mark column and the space before the icon.
+                           (my/sidebar-name-width "  ")
+                           my/sidebar-name-margin))))
+         (shown (if (and room (> (my/sidebar-name-width name) room))
+                    (length (truncate-string-pixelwise
+                             name (max 0 (- room (my/sidebar-name-width "…")))
+                             (current-buffer)))
+                  (length name)))
+         (key (if (< shown (length name)) 'my/sidebar-tail 'my/sidebar-ext)))
+    (when (< (+ start shown) (overlay-end label))
+      (let ((hidden (make-overlay (+ start shown) (overlay-end label))))
+        (overlay-put hidden 'invisible key)
+        (overlay-put hidden 'my/sidebar-row t)
+        (overlay-put hidden 'evaporate t)
+        (overlay-put label key hidden)))))
+
+(defun my/sidebar-label-text (label)
+  "Return the name under overlay LABEL as drawn, with the buffer's faces."
+  (let* ((name (overlay-get label 'my/sidebar-name))
+         (start (overlay-start label))
+         (text (buffer-substring start (+ start (length name)))))
+    ;; Packages draw dots for slashes.
+    (dotimes (i (length name))
+      (aset text i (aref name i)))
+    text))
 
 (defun my/sidebar-highlight (string face)
   "Return STRING with FACE, a selection face or nil, beneath its own faces.
@@ -583,11 +777,24 @@ Overlay strings do not take the background of the selection overlay."
               (file (dired-get-filename nil t)))
     (let* ((directory-p (file-directory-p file))
            (name (buffer-substring-no-properties start end))
+           (icon (if directory-p (my/sidebar-folder-icon file)
+                   (my/sidebar-type-icon file)))
+           (dotted (and directory-p (equal icon "nodes/package")
+                        (string-search "/" name)))
            ;; Dired leaves the space before the name visible; the chevron
            ;; takes its place.
            (space (make-overlay (1- start) start))
            (label (make-overlay start end))
            (selected (my/sidebar-selected-face start)))
+      ;; A compacted package draws its slashes as dots.
+      (when dotted
+        (save-excursion
+          (goto-char start)
+          (while (search-forward "/" end t)
+            (let ((dot (make-overlay (1- (point)) (point))))
+              (overlay-put dot 'display ".")
+              (overlay-put dot 'my/sidebar-row t)
+              (overlay-put dot 'evaporate t)))))
       ;; No hover face or tooltip: Dired's would repaint the name alone,
       ;; and a shortened name shows in full instead (see Full names).
       (with-silent-modifications
@@ -601,12 +808,18 @@ Overlay strings do not take the background of the selection overlay."
                    (my/sidebar-highlight
                     (propertize
                      (concat (my/sidebar-state directory-p) " "
-                             (my/sidebar-icon name directory-p)
+                             (my/sidebar-icon
+                              (or icon (expui-icons-name-for-file name directory-p)))
                              (propertize " " 'display
                                          `(space :width (,my/sidebar-icon-gap))))
                      'pointer 'hand)
                     selected))
       (overlay-put label 'my/sidebar-label (my/sidebar-tree-depth))
+      (overlay-put label 'my/sidebar-name
+                   (cond (dotted (string-replace "/" "." name))
+                         ;; A type's row leaves out its file's extension.
+                         ((and icon (not directory-p)) (file-name-sans-extension name))
+                         (t name)))
       (overlay-put label 'my/sidebar-hl selected)
       (when selected (push label my/sidebar-hl-rows))
       (overlay-put label 'pointer 'hand)
@@ -826,9 +1039,8 @@ LINE is the row's start; KEY changes when the row is drawn again.")
                       (+ (my/sidebar-name-width "  ") my/sidebar-state-width)))
              (text (with-current-buffer buffer
                      (concat (substring (overlay-get label 'before-string) 2)
-                             (my/sidebar-highlight
-                              (buffer-substring (overlay-start label) (overlay-end label))
-                              selected)
+                             (my/sidebar-highlight (my/sidebar-label-text label)
+                                                   selected)
                              (propertize " " 'display
                                          `(space :width (,my/sidebar-icon-gap)))))))
         (with-current-buffer (get-buffer-create my/sidebar-name-buffer)

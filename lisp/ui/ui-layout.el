@@ -202,6 +202,86 @@ INSIDE, OUTSIDE and LINE are as in `my/ui-corner'."
           (my/ui-corner (if top 'top-right 'bottom-right)
                         radius height inside outside line)))
 
+;;;; Pills
+
+;; A selected row in a list is a pill: a band with rounded ends.  Faces
+;; have no rounded corners, so the ends are images as tall as the row.
+;; `line-spacing' would add to an image's height, so rows that hold a
+;; pill take their height from a strut, an invisible image, instead.
+
+(defvar my/ui--pill-cache (make-hash-table :test #'equal)
+  "Strut and pill end strings by their arguments.")
+
+(defun my/ui--image-string (svg)
+  "Return a string displaying SVG, centered on its row's text as icons are.
+The image is loaded at once: a frame fitted to its rows before then would
+measure them as tall as their text."
+  (let ((image (create-image svg 'svg t :ascent 'center :scale 1)))
+    (when (display-images-p)
+      (image-size image t))
+    (propertize " " 'display image)))
+
+(defun my/ui-strut (height)
+  "Return a one-pixel-wide string that makes its row HEIGHT pixels high.
+The row's text stays centered in it."
+  (with-memoization (gethash (list nil height) my/ui--pill-cache)
+    (my/ui--image-string
+     (format "<svg xmlns='http://www.w3.org/2000/svg' width='1' height='%d'/>"
+             height))))
+
+(defun my/ui-pill-end (side radius height color &optional margin outside row line)
+  "Return a string showing the SIDE end of a pill, RADIUS pixels round.
+SIDE is `left' or `right'.  The end fills a row HEIGHT pixels high in
+COLOR, and also sets the row's height as `my/ui-strut' does.  MARGIN
+pixels, 0 by default, stay clear outside it: the string is MARGIN plus
+RADIUS pixels wide.  The clear part shows OUTSIDE, or else the image's
+background, which is that of the face the string is drawn in: pass
+OUTSIDE when that face may be the selection's own.
+
+ROW, a height in pixels, makes the image that tall instead, with the
+pill centered in it, and ignores the row's box, overline and underline,
+as `my/ui-corner' does: a pill in a header or mode line.  LINE then
+draws a one-pixel line along its top, continuing the row's overline."
+  (let ((margin (or margin 0)))
+    (with-memoization (gethash (list side radius height color margin outside row line)
+                               my/ui--pill-cache)
+      (let* ((width (+ margin radius))
+             (total (or row height))
+             (top (/ (- total height) 2))
+             (bottom (+ top height))
+             (image (my/ui--image-string
+                     (format "<svg xmlns='http://www.w3.org/2000/svg' width='%d' height='%d'>\
+%s<path d='%s' fill='%s'/>%s</svg>"
+                             width total
+                             (if outside
+                                 (format "<rect width='%d' height='%d' fill='%s'/>"
+                                         width total (my/ui--svg-color outside))
+                               "")
+                             (if (eq side 'left)
+                                 (format "M%d,%d A%d,%d 0 0 0 %d,%d V%d A%d,%d 0 0 0 %d,%d Z"
+                                         width top radius radius margin (+ top radius)
+                                         (- bottom radius) radius radius width bottom)
+                               (format "M0,%d A%d,%d 0 0 1 %d,%d V%d A%d,%d 0 0 1 0,%d Z"
+                                       top radius radius radius (+ top radius)
+                                       (- bottom radius) radius radius bottom))
+                             (my/ui--svg-color color)
+                             (if line
+                                 (format "<rect width='%d' height='1' fill='%s'/>"
+                                         width (my/ui--svg-color line))
+                               "")))))
+        (if row
+            (propertize image 'face '(:box nil :overline nil :underline nil))
+          image)))))
+
+(defun my/ui-pill-right (radius height color &optional margin edge)
+  "Return the right end of a pill in COLOR, reaching EDGE from the text before.
+EDGE is an `:align-to' position, `right' by default.  RADIUS, HEIGHT and
+MARGIN are as in `my/ui-pill-end'."
+  (concat (propertize " " 'face `(:background ,color)
+                      'display `(space :align-to (- ,(or edge 'right)
+                                                    (,(+ radius (or margin 0))))))
+          (my/ui-pill-end 'right radius height color margin)))
+
 (defun my/ui--forget-glyph-scales (&rest _)
   "Measure glyphs and draw corners again after fonts or colors change."
   (clrhash my/ui--glyph-scale-cache)

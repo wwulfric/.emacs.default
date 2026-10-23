@@ -106,8 +106,8 @@
    `(my/tab-line-source-current ((t (:foreground ,green :background ,bg
                                       :underline (:color ,green :position t)))))
    `(my/sidebar-file-name ((t (:inherit my/ui-font :height 1.0))))
-   `(my/sidebar-hl-line ((t (:inherit nil :background ,selection :extend t))))
-   `(my/sidebar-hl-line-inactive ((t (:inherit nil :background ,inactive-selection :extend t))))
+   `(my/sidebar-hl-line ((t (:inherit nil :background ,selection))))
+   `(my/sidebar-hl-line-inactive ((t (:inherit nil :background ,inactive-selection))))
    `(my/sidebar-project-title ((t (:inherit my/ui-font :foreground ,fg :weight medium))))
    `(my/sidebar-neutral-icon ((t (:foreground ,muted))))
    `(my/sidebar-source-icon ((t (:foreground ,accent))))

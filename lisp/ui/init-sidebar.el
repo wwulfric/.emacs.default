@@ -83,12 +83,18 @@
         (unless my/sidebar-font-face-cookie
           (setq my/sidebar-font-face-cookie
                 (face-remap-add-relative 'default 'my/sidebar-file-name)))
-        ;; Emacs 31 splits the spacing above and below, centering the text;
-        ;; older versions put it all below.
-        (setq-local line-spacing
-                    (if (< emacs-major-version 31) 0.35 '(0.175 . 0.175)))
-        ;; A row a pixel too wide is clipped, never wrapped.
-        (setq-local truncate-lines t)
+        ;; Rows take their height from the line prefix's strut, not from
+        ;; `line-spacing', which would add to the height of a selected row's
+        ;; rounded ends.
+        (setq-local line-prefix (my/sidebar-row-prefix 0))
+        ;; A row a pixel too wide is clipped, never wrapped.  Nor scrolled:
+        ;; at a selected row's end, point lies past its rounded end.
+        (setq-local truncate-lines t
+                    auto-hscroll-mode nil
+                    ;; A selected row reaches the edge, and names end in their
+                    ;; own ellipsis.
+                    fringe-indicator-alist
+                    (cons '(truncation nil nil) fringe-indicator-alist))
         ;; Shortened names end in an ellipsis drawn in their own face.
         (add-to-invisibility-spec '(my/sidebar-tail . t))
         ;; A JVM type's row hides its file's extension.
@@ -134,8 +140,10 @@
     (when my/sidebar-font-face-cookie
       (face-remap-remove-relative my/sidebar-font-face-cookie)
       (setq my/sidebar-font-face-cookie nil))
-    (kill-local-variable 'line-spacing)
+    (kill-local-variable 'line-prefix)
     (kill-local-variable 'truncate-lines)
+    (kill-local-variable 'auto-hscroll-mode)
+    (kill-local-variable 'fringe-indicator-alist)
     (remove-from-invisibility-spec '(my/sidebar-tail . t))
     (remove-from-invisibility-spec 'my/sidebar-ext)
     (kill-local-variable 'buffer-display-table)
@@ -214,6 +222,43 @@ Visiting a directory in an editor then makes a Dired buffer of its own."
 
 (defconst my/sidebar-indent 16
   "Pixels each folder level indents its entries.")
+
+;; As in JetBrains' New UI, a selected row is a pill inset from the
+;; window's edges (see Pills in ui-layout.el), its left end in the margin
+;; every row keeps clear for it.
+
+(defconst my/sidebar-hl-margin 6
+  "Pixels between a selected row's highlight and the window's edges.")
+
+(defconst my/sidebar-hl-radius 6
+  "Radius in pixels of a selected row's rounded ends.")
+
+(defconst my/sidebar-row-inset (+ my/sidebar-hl-margin my/sidebar-hl-radius)
+  "Pixels before every entry, where a selected row's left end is drawn.")
+
+(defvar my/sidebar-row-height 1.65
+  "Height of a sidebar row, in frame character units.")
+
+(defun my/sidebar-row-pixels ()
+  "Return the height of a sidebar row in pixels."
+  (ceiling (* (frame-char-height) my/sidebar-row-height)))
+
+(defun my/sidebar-row-prefix (depth &optional face)
+  "Return the line prefix of a row DEPTH folders deep, which sets its height.
+FACE, a selection face, highlights the row from a rounded left end."
+  (concat (if face
+              (my/ui-pill-end 'left my/sidebar-hl-radius (my/sidebar-row-pixels)
+                              (face-background face nil t) my/sidebar-hl-margin)
+            (my/ui-strut (my/sidebar-row-pixels)))
+          (propertize " " 'face face
+                      'display `(space :width (,(- (+ my/sidebar-row-inset
+                                                       (* depth my/sidebar-indent))
+                                                    (if face my/sidebar-row-inset 1)))))))
+
+(defun my/sidebar-row-end (face)
+  "Return the end of a row selected in FACE: the highlight to a rounded end."
+  (my/ui-pill-right my/sidebar-hl-radius (my/sidebar-row-pixels)
+                    (face-background face nil t) my/sidebar-hl-margin))
 
 (defvar my/sidebar-expand-limit 30
   "Most folders one `my/sidebar-tree-expand-all' lists; each starts a process.")
@@ -317,9 +362,7 @@ No line there heads a Dired subdirectory."
                 (overlay-put node 'my/sidebar-depth depth)
                 (overlay-put node 'priority depth)
                 (overlay-put node 'evaporate t)
-                (overlay-put node 'line-prefix
-                             (propertize " " 'display
-                                         `(space :width (,(* depth my/sidebar-indent)))))
+                (overlay-put node 'line-prefix (my/sidebar-row-prefix depth))
                 (my/sidebar-rows-draw start (point))))))
         (push directory my/sidebar-tree-dirs)
         ;; The folder's chevron now points down.
@@ -734,6 +777,7 @@ label's `my/sidebar-name', which may leave out an extension."
          (start (overlay-start label))
          (room (when my/sidebar-rows-width
                  (max 0 (- my/sidebar-rows-width
+                           my/sidebar-row-inset
                            (* (overlay-get label 'my/sidebar-label) my/sidebar-indent)
                            my/sidebar-state-width expui-icons-height
                            my/sidebar-icon-gap
@@ -851,7 +895,15 @@ Overlay strings do not take the background of the selection overlay."
     (with-current-buffer buffer
       (when my/sidebar-mode
         (setq my/sidebar-name-widths nil)
-        (my/sidebar-rows-draw (point-min) (point-max))))))
+        ;; Row heights follow the font, and the selection's ends its color.
+        (setq-local line-prefix (my/sidebar-row-prefix 0))
+        (dolist (node (overlays-in (point-min) (point-max)))
+          (when-let* ((depth (overlay-get node 'my/sidebar-depth)))
+            (overlay-put node 'line-prefix (my/sidebar-row-prefix depth))))
+        (mapc #'delete-overlay my/sidebar-hl)
+        (setq my/sidebar-hl nil)
+        (my/sidebar-rows-draw (point-min) (point-max))
+        (my/sidebar-select)))))
 ;; Color icons have light and dark variants.
 (add-hook 'enable-theme-functions #'my/sidebar-rows-refresh)
 
@@ -862,9 +914,9 @@ Overlay strings do not take the background of the selection overlay."
 ;; touches, since Dired's marking and deletion commands act on the region.
 ;; The cursor itself stays hidden.
 
-(defface my/sidebar-hl-line '((t (:inherit highlight :extend t)))
+(defface my/sidebar-hl-line '((t (:inherit highlight)))
   "Selected sidebar row while the sidebar is in use." :group 'dired)
-(defface my/sidebar-hl-line-inactive '((t (:inherit secondary-selection :extend t)))
+(defface my/sidebar-hl-line-inactive '((t (:inherit secondary-selection)))
   "Selected sidebar row while another window is in use." :group 'dired)
 
 (defun my/sidebar-selected-face (position)
@@ -933,16 +985,15 @@ WINDOW defaults to a window showing the current buffer."
                   (mapcar (lambda (line)
                             ;; Front-advance: rows a folder inserts above stay outside.
                             (let ((overlay (make-overlay
-                                            line (save-excursion (goto-char line) (pos-bol 2))
+                                            line (save-excursion (goto-char line) (pos-eol))
                                             nil t)))
                               ;; Above the folders' indentation, which it also highlights.
                               (overlay-put overlay 'priority 100)
                               (overlay-put overlay 'evaporate t)
                               (overlay-put overlay 'face face)
                               (overlay-put overlay 'line-prefix
-                                           (propertize " " 'face face 'display
-                                                       `(space :width (,(* (my/sidebar-tree-depth line)
-                                                                           my/sidebar-indent)))))
+                                           (my/sidebar-row-prefix (my/sidebar-tree-depth line) face))
+                              (overlay-put overlay 'after-string (my/sidebar-row-end face))
                               overlay))
                           lines))
             ;; Icons and shortened names carry the background themselves.
@@ -1042,14 +1093,15 @@ LINE is the row's start; KEY changes when the row is drawn again.")
                              (my/sidebar-highlight (my/sidebar-label-text label)
                                                    selected)
                              (propertize " " 'display
-                                         `(space :width (,my/sidebar-icon-gap)))))))
+                                         `(space :width (,my/sidebar-icon-gap)))
+                             ;; The row's height.
+                             (my/ui-strut (my/sidebar-row-pixels))))))
         (with-current-buffer (get-buffer-create my/sidebar-name-buffer)
-          ;; The sidebar's fonts, card color and row height.
+          ;; The sidebar's fonts and card color.
           (setq-local face-remapping-alist
                       (copy-tree (buffer-local-value 'face-remapping-alist buffer)))
           (when selected
-            (face-remap-add-relative 'default :background (face-background selected nil t)))
-          (setq-local line-spacing (buffer-local-value 'line-spacing buffer)))
+            (face-remap-add-relative 'default :background (face-background selected nil t))))
         ;; The child frame lies under the pointer; leave the pointer there.
         (let ((posframe-mouse-banish-function #'ignore))
           (posframe-show my/sidebar-name-buffer

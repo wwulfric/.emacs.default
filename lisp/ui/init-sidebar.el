@@ -1502,7 +1502,16 @@ When it starts showing DIRECTORY, expand it to the current buffer's file."
 (define-key my/sidebar-mode-map [mouse-1] #'my/sidebar-mouse-visit)
 (define-key my/sidebar-mode-map [mouse-2] #'my/sidebar-mouse-visit)
 
+(declare-function my/welcome-empty-buffer "init-welcome")
+
 (defun my/sidebar-empty-buffer (directory)
+  "Return an empty editor buffer for DIRECTORY.
+Before the start page loads, use a scratch buffer, preserving its text."
+  (if (fboundp 'my/welcome-empty-buffer)
+      (my/welcome-empty-buffer directory)
+    (my/sidebar-scratch-buffer directory)))
+
+(defun my/sidebar-scratch-buffer (directory)
   "Return an empty scratch buffer for DIRECTORY, preserving existing text."
   (let ((buffer (get-buffer-create "*scratch*")))
     (unless (zerop (buffer-size buffer))
@@ -1513,17 +1522,20 @@ When it starts showing DIRECTORY, expand it to the current buffer's file."
       (setq-local default-directory (file-name-as-directory directory)))
     buffer))
 
+(declare-function my/workspace-root-of "init-workspace" (directory))
+
 (defun my/sidebar-open-directory (directory)
-  "Open DIRECTORY in the sidebar with an empty editor buffer."
-  (interactive "DOpen directory: ")
-  (setq directory (expand-file-name directory))
-  (switch-to-buffer (my/sidebar-empty-buffer directory))
-  (my/sidebar-show directory))
+  "Open DIRECTORY's project, or DIRECTORY itself, as a workspace.
+Like the start page, this remembers the project and gives it its own tabs."
+  (interactive (list (read-directory-name "Open directory: " nil nil t)))
+  (my/workspace-open (my/workspace-root-of directory)))
 
 (defun my/sidebar-project-dired ()
-  "Open the selected project as a sidebar and empty editor buffer."
+  "Show the current project in the sidebar with an empty editor buffer."
   (interactive)
-  (my/sidebar-open-directory (project-root (project-current t))))
+  (let ((directory (project-root (project-current t))))
+    (switch-to-buffer (my/sidebar-empty-buffer directory))
+    (my/sidebar-show directory)))
 
 (defun my/sidebar-after-project-find-file (&rest _)
   "Show the current project after opening a project file."

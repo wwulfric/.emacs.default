@@ -157,7 +157,9 @@ The title bar names the project and its branch (init-frame-title.el)."
          (root (and file (my/status--project-root)))
          (separator (propertize " › " 'face 'my/status-muted)))
     (if (not file)
-        (propertize (buffer-name) 'face 'my/status)
+        ;; Hidden buffers, such as the empty editor, name nothing.
+        (unless (string-prefix-p " " (buffer-name))
+          (propertize (buffer-name) 'face 'my/status))
       (let* ((relative (if (and root (string-prefix-p root file))
                            (substring file (length root))
                          (abbreviate-file-name file)))

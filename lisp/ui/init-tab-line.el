@@ -167,6 +167,9 @@ Process buffers can be created without running a major-mode hook."
   (setq tab-line-separator "")
   (setq tab-line-tab-name-function #'tab-line-tab-name-buffer)
   (setq tab-line-tab-name-format-function #'my/tab-line-format-with-padding)
+  ;; Closing a tab closes its file, as in JetBrains.  Burying would only
+  ;; hide it: a project's buffers then take turns in its last window.
+  (setq tab-line-close-tab-function #'kill-buffer)
   (add-hook 'tab-line-mode-hook #'my/tab-line-manage-hover-timer)
   (add-hook 'global-tab-line-mode-hook #'my/tab-line-manage-hover-timer)
   (add-hook 'window-state-change-functions #'my/tab-line-manage-hover-timer)

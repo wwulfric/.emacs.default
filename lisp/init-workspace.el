@@ -25,6 +25,7 @@
 (declare-function my/sidebar-hide "init-sidebar")
 (declare-function my/sidebar-take-startup-directory "init-sidebar")
 (declare-function my/welcome-show "init-welcome")
+(declare-function my/welcome-empty-buffer "init-welcome")
 (declare-function my/frame-title-directory "init-frame-title")
 (defvar my/frame-title-cache)
 
@@ -361,14 +362,41 @@ the saved workspace."
 
 ;;;; Restore
 
-(defun my/workspace-empty-buffer (directory)
-  "Return an empty editor buffer whose default directory is DIRECTORY."
-  (if (fboundp 'my/sidebar-empty-buffer)
-      (my/sidebar-empty-buffer directory)
-    (let ((buffer (get-scratch-buffer-create)))
-      (with-current-buffer buffer
-        (setq-local default-directory (file-name-as-directory directory)))
-      buffer)))
+(defun my/workspace-empty-buffer (directory &optional except)
+  "Return an empty editor buffer whose default directory is DIRECTORY.
+It is the start page's editor hints when loaded; EXCEPT is a buffer not
+to reuse, such as one being killed."
+  (cond ((fboundp 'my/welcome-empty-buffer)
+         (my/welcome-empty-buffer directory except))
+        ((fboundp 'my/sidebar-empty-buffer)
+         (my/sidebar-empty-buffer directory))
+        (t (let ((buffer (get-scratch-buffer-create)))
+             (with-current-buffer buffer
+               (setq-local default-directory (file-name-as-directory directory)))
+             buffer))))
+
+(defun my/workspace-readme (root)
+  "Return ROOT's README file, preferring Markdown, then Org, or nil."
+  (let* ((case-fold-search t)
+         (files (seq-filter
+                 (lambda (file)
+                   (and (string-match-p "\\`readme\\(?:\\.[^.]+\\)?\\'" file)
+                        (file-regular-p (expand-file-name file root))))
+                 (ignore-errors (directory-files root))))
+         (rank (lambda (file)
+                 (cond ((string-match-p "\\.\\(?:md\\|markdown\\)\\'" file) 0)
+                       ((string-match-p "\\.org\\'" file) 1)
+                       (t 2)))))
+    (when files
+      (expand-file-name (car (sort files (lambda (a b) (< (funcall rank a) (funcall rank b)))))
+                        root))))
+
+(defun my/workspace-landing-buffer (root)
+  "Return the buffer a workspace without open files shows: ROOT's README,
+or the empty editor."
+  (if-let* ((readme (my/workspace-readme root)))
+      (find-file-noselect readme)
+    (my/workspace-empty-buffer root)))
 
 (defun my/workspace--open (entry root)
   "Visit ENTRY's file; return (BUFFER START POINT) or nil when it is gone."
@@ -459,7 +487,7 @@ already shown in the window keep their place."
         (next (plist-get node :next)))
     (while (and (not current) prev)
       (setq current (my/workspace--open (pop prev) root)))
-    (my/workspace--show-only window (if current (car current) (my/workspace-empty-buffer root)))
+    (my/workspace--show-only window (if current (car current) (my/workspace-landing-buffer root)))
     (when current
       (when (nth 1 current) (set-window-start window (nth 1 current) t))
       (when (nth 2 current) (set-window-point window (nth 2 current))))
@@ -552,7 +580,7 @@ restores the frame size and position."
     (when geometry (my/workspace--apply-geometry frame (plist-get state :frame)))
     (if layout
         (setq selected (my/workspace--build layout window root))
-      (my/workspace--show-only window (my/workspace-empty-buffer root)))
+      (my/workspace--show-only window (my/workspace-landing-buffer root)))
     (select-window (if (window-live-p selected) selected window))
     (my/workspace--refresh-tabs)
     (dolist (file (reverse files))
@@ -582,6 +610,41 @@ restores the frame size and position."
                                        (if (= my/workspace--missing 1) "" "s"))
                              "")))
                (format "Opened %s" (my/workspace-root-name root))))))
+
+;;;; Buffer fallback
+
+;; Burying or killing a buffer shows the window's previous buffer.  In a
+;; project frame that is only a buffer of the project: another project's
+;; buffers never come back, and with none left the empty editor shows.
+
+(defun my/workspace-buffer-in-root-p (buffer root)
+  "Return non-nil when BUFFER's file, or its directory, is under ROOT."
+  (let ((file (or (buffer-file-name buffer)
+                  (buffer-local-value 'default-directory buffer))))
+    (and file (string-prefix-p (expand-file-name root) (expand-file-name file)))))
+
+(defun my/workspace--editor-root (window)
+  "Return the project root of WINDOW's frame when WINDOW is an editor."
+  (and (not (window-minibuffer-p window))
+       (not (window-parameter window 'window-side))
+       (frame-parameter (window-frame window) 'my/workspace-root)))
+
+(defun my/workspace--skip-buffer-p (window buffer _bury-or-kill)
+  "Return non-nil when WINDOW should not fall back to BUFFER."
+  (when-let* ((root (my/workspace--editor-root window)))
+    (not (my/workspace-buffer-in-root-p buffer root))))
+
+(defun my/workspace--fallback (switch &optional window bury-or-kill)
+  "Call SWITCH with WINDOW and BURY-OR-KILL; show the empty editor when it
+finds no buffer of the project for a buried or killed one."
+  (let ((window (window-normalize-window window t)))
+    (or (funcall switch window bury-or-kill)
+        (when-let* ((bury-or-kill)
+                    (root (my/workspace--editor-root window))
+                    (old (window-buffer window))
+                    (buffer (my/workspace-empty-buffer root old)))
+          (set-window-buffer window buffer)
+          buffer))))
 
 ;;;; Commands
 
@@ -676,6 +739,8 @@ fills the placeholder buffer init.el shows while loading."
 ;;;; Wiring
 
 (setq project-switch-commands #'my/workspace-switch-command)
+(setq switch-to-prev-buffer-skip #'my/workspace--skip-buffer-p)
+(advice-add 'switch-to-prev-buffer :around #'my/workspace--fallback)
 ;; Replaces init-navigation's global storage; frames without a project
 ;; still use the global history.
 (setq xref-history-storage #'my/workspace-xref-history)

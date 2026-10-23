@@ -467,5 +467,126 @@ descriptions line up; columns are as many as fit, at most three."
 
 (keymap-set project-prefix-map "w" #'my/welcome-show)
 
+;;;; Empty editor
+
+;; A project with no open file shows what JetBrains' empty editor does: a
+;; centered list of ways to open something, with this config's keys.
+
+(defconst my/welcome-empty-actions
+  '(("Search Everywhere" . my/search)
+    ("Go to File" . my/search-files)
+    ("Recent Files" . consult-buffer)
+    ("Find in Files" . my/search-text)
+    ("Find Action" . my/search-commands)
+    ("Project View" . my/sidebar-toggle)
+    ("Switch Project" . project-switch-project))
+  "Rows of the empty editor as (LABEL . COMMAND); unbound commands are left out.")
+
+(defconst my/welcome-empty-gap 24 "Pixels between a label and its keys.")
+
+(defconst my/welcome-key-glyphs
+  '(("C" . "⌃") ("M" . "⌥") ("S" . "⇧") ("s" . "⌘"))
+  "Modifier glyphs, in the order macOS writes them.")
+
+(defun my/welcome-key-label (keys)
+  "Describe KEYS the way macOS menus do, such as ⇧⌘O."
+  (mapconcat
+   (lambda (chord)
+     (let ((mods '()))
+       (while (string-match "\\`\\([CMSs]\\)-\\(.+\\)" chord)
+         (push (match-string 1 chord) mods)
+         (setq chord (match-string 2 chord)))
+       (setq chord (string-trim chord "<" ">"))
+       ;; An upper-case letter is typed with Shift.
+       (when (and (= (length chord) 1) (not (equal (upcase chord) (downcase chord)))
+                  (equal chord (upcase chord)))
+         (push "S" mods))
+       (concat (mapconcat (lambda (glyph) (if (member (car glyph) mods) (cdr glyph) ""))
+                          my/welcome-key-glyphs "")
+               (pcase chord
+                 ("RET" "↩") ("return" "↩") ("TAB" "⇥") ("SPC" "Space")
+                 ((pred (string-match-p "\\`f[0-9]+\\'")) (upcase chord))
+                 (_ (if (= (length chord) 1) (upcase chord) chord))))))
+   (split-string (key-description keys))
+   " "))
+
+(defun my/welcome-best-key (command)
+  "Return COMMAND's shortest binding, preferring one with Command (super)."
+  (car (sort (where-is-internal command nil nil t)
+             (lambda (a b)
+               (let ((sa (memq 'super (event-modifiers (aref a 0))))
+                     (sb (memq 'super (event-modifiers (aref b 0)))))
+                 (if (eq (not sa) (not sb)) (< (length a) (length b)) sa))))))
+
+(defun my/welcome-empty-rows ()
+  "Return the empty editor's rows as (LABEL . KEYS) strings."
+  (cl-loop for (label . command) in my/welcome-empty-actions
+           for keys = (and (fboundp command) (my/welcome-best-key command))
+           when keys
+           collect (cons (propertize label 'face 'my/welcome-hint)
+                         (my/ui-fit-tall-glyphs
+                          (propertize (my/welcome-key-label keys) 'face 'my/welcome-key)))))
+
+(defun my/welcome-empty-render ()
+  "Draw the empty editor's rows centered in its window."
+  (let* ((inhibit-read-only t)
+         (window (get-buffer-window (current-buffer)))
+         (height (if window (window-body-height window) 30))
+         (rows (my/welcome-empty-rows))
+         (pixels (lambda (strings)
+                   (apply #'max 0 (mapcar (lambda (string) (string-pixel-width string (current-buffer)))
+                                          strings))))
+         (labels (funcall pixels (mapcar #'car rows)))
+         (keys (funcall pixels (mapcar #'cdr rows)))
+         (half (/ (+ labels my/welcome-empty-gap keys) 2))
+         (strut (propertize " " 'display `(space :width 0 :height ,my/welcome-line-height))))
+    (erase-buffer)
+    (insert (make-string (max 1 (floor (- height (* (length rows) my/welcome-line-height)) 2))
+                         ?\n))
+    (pcase-dolist (`(,label . ,key) rows)
+      (insert (propertize " " 'display `(space :align-to (- center (,half))))
+              label
+              (propertize " " 'display `(space :align-to (+ center (,(- (+ labels my/welcome-empty-gap) half)))))
+              key strut "\n"))
+    (goto-char (point-min))))
+
+(defun my/welcome-empty--on-resize (window)
+  "Re-center the empty editor shown in WINDOW."
+  (with-current-buffer (window-buffer window)
+    (when (derived-mode-p 'my/welcome-empty-mode)
+      (with-selected-window window (my/welcome-empty-render)))))
+
+(put 'my/welcome-empty-mode 'tab-line-exclude t)
+
+(define-derived-mode my/welcome-empty-mode special-mode "Empty"
+  "What an editor window shows when its project has no open file."
+  (setq-local cursor-type nil
+              truncate-lines t
+              mode-line-format nil
+              tab-line-exclude t
+              revert-buffer-function (lambda (&rest _) (my/welcome-empty-render)))
+  (when (bound-and-true-p tab-line-mode) (tab-line-mode -1))
+  (add-hook 'window-size-change-functions #'my/welcome-empty--on-resize nil t))
+
+(defun my/welcome-empty-buffer (directory &optional except)
+  "Return the empty editor for DIRECTORY, other than the buffer EXCEPT.
+Its name starts with a space, so buffer lists and tab strips leave it out."
+  (let* ((directory (file-name-as-directory (expand-file-name directory)))
+         (buffer (or (seq-find (lambda (buffer)
+                                 (and (not (eq buffer except))
+                                      (eq (buffer-local-value 'major-mode buffer)
+                                          'my/welcome-empty-mode)
+                                      (equal (buffer-local-value 'default-directory buffer)
+                                             directory)))
+                               (buffer-list))
+                     (generate-new-buffer
+                      (format " *Empty Editor: %s*" (abbreviate-file-name directory))))))
+    (with-current-buffer buffer
+      (unless (derived-mode-p 'my/welcome-empty-mode)
+        (my/welcome-empty-mode)
+        (setq default-directory directory))
+      (my/welcome-empty-render))
+    buffer))
+
 (provide 'init-welcome)
 ;;; init-welcome.el ends here

@@ -1109,6 +1109,12 @@ POSITION is from `mouse-pixel-position'."
 (defun my/sidebar-track-hover ()
   "Note which sidebar the mouse is over and redraw the bars that change."
   (let* ((position (mouse-pixel-position))
+         ;; Left of or above the frame the pointer has negative coordinates,
+         ;; which `window-at-x-y' and `posn-at-x-y' reject: it is outside.
+         (position (if (and (cadr position)
+                            (or (< (cadr position) 0) (< (cddr position) 0)))
+                       (list (car position))
+                     position))
          (window (and (frame-live-p (car position)) (cadr position)
                       (window-at-x-y (cadr position) (cddr position)
                                      (car position))))

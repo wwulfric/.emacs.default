@@ -101,6 +101,10 @@
                                 :foreground ,accent :background ,bg
                                 :underline (:color ,accent :position t)))))
    `(tab-line-highlight ((t (:box nil :background ,bg :foreground ,accent :weight normal))))
+   ;; Buttons under the mouse: accent text, no box; a rectangle would clash
+   ;; with rounded buttons and icons.
+   `(my/sidebar-toolbar-hover ((t (:inherit nil :foreground ,accent))))
+   `(my/status-hover ((t (:inherit nil :foreground ,accent))))
    ;; Dependency source tabs retain a green cue without a filled rectangle.
    `(my/tab-line-source ((t (:foreground ,green :background ,bg))))
    `(my/tab-line-source-current ((t (:foreground ,green :background ,bg
@@ -111,6 +115,19 @@
    `(my/sidebar-project-title ((t (:inherit my/ui-font :foreground ,fg :weight medium))))
    `(my/sidebar-neutral-icon ((t (:foreground ,muted))))
    `(my/sidebar-source-icon ((t (:foreground ,accent))))
+   ;; Git tool windows (lisp/git): IntelliJ's change colors from this palette.
+   `(git-islands-modified ((t (:foreground ,accent))))
+   `(git-islands-added ((t (:foreground ,green))))
+   `(git-islands-deleted ((t (:foreground ,muted))))
+   `(git-islands-untracked ((t (:foreground ,string))))
+   `(git-islands-conflict ((t (:foreground ,red))))
+   `(git-islands-dim ((t (:foreground ,muted))))
+   `(git-islands-button ((t (:background ,hover :foreground ,fg))))
+   `(git-islands-primary-button ((t (:background ,accent :foreground ,bg))))
+   `(git-islands-ref-head ((t (:foreground ,amber))))
+   `(git-islands-ref-local ((t (:foreground ,green))))
+   `(git-islands-ref-remote ((t (:foreground ,syntax-purple))))
+   `(git-islands-ref-tag ((t (:foreground ,syntax-function))))
    `(dired-directory ((t (:foreground ,fg :weight bold))))
    `(dired-symlink ((t (:foreground ,green))))
    '(dired-flagged ((t (:inherit error))))

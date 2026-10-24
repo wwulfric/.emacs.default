@@ -79,6 +79,13 @@
   "Where the next minibuffer appears: `palette', `point', or nil for the echo area.
 Let-bind it around code that reads from the minibuffer.")
 
+(defvar my/palette-anchor nil
+  "Frame pixel position (X Y LINE-HEIGHT) for the next panel at `point'.
+Or a function returning one, asked each time the panel shows, as windows
+may move once the minibuffer opens.  Nil places the panel under the symbol
+at point.  Let-bind it, with `my/palette-placement', to drop a panel down
+from a button.")
+
 (defvar my/palette-titles
   '((execute-extended-command . "Commands")
     (project-find-file . "Go to File")
@@ -300,7 +307,10 @@ window."
   (my/palette--drop-snapshot)
   (let* ((buffer (current-buffer))
          (input (point))
-         (anchor (and (eq my/palette--placement 'point) my/palette--anchor))
+         (anchor (and (eq my/palette--placement 'point)
+                      (if (functionp my/palette--anchor)
+                          (funcall my/palette--anchor)
+                        my/palette--anchor)))
          (origin (my/palette--origin))
          (frame
           ;; Poshandlers measure the editor window, not the minibuffer.
@@ -369,11 +379,44 @@ so the windows above do not move while the panel is open."
   (when-let* ((window (active-minibuffer-window))
               ((eq (window-buffer window) (current-buffer))))
     (setq-local resize-mini-windows nil)
-    (let ((delta (- (or my/palette--echo-height 0) (window-pixel-height window))))
-      (unless (zerop delta)
-        (ignore-errors (window-resize window delta nil nil 'pixelwise))))
-    (set-window-vscroll window 100)
+    (my/palette--hold-echo-area t)
+    (my/palette--hide-copy window)
     (my/palette--show)))
+
+(defvar my/palette--saved-resize 'unset
+  "Default of `resize-mini-windows' while a panel is open, or `unset'.")
+
+(defun my/palette--hold-echo-area (hold)
+  "Keep the echo area's height while panels are open if HOLD, else restore it.
+The minibuffer's own nil value applies only while it is current: a
+command in another window would let redisplay shrink the echo area to
+the hidden input's one line."
+  (cond ((and hold (eq my/palette--saved-resize 'unset))
+         (setq my/palette--saved-resize (default-value 'resize-mini-windows))
+         (setq-default resize-mini-windows nil))
+        ((and (not hold) (not (eq my/palette--saved-resize 'unset)))
+         (setq-default resize-mini-windows my/palette--saved-resize)
+         (setq my/palette--saved-resize 'unset))))
+
+(defun my/palette--hide-copy (window)
+  "Scroll the echo-area copy in minibuffer WINDOW out of view, at the echo
+area's height."
+  (let ((delta (- (or my/palette--echo-height 0) (window-pixel-height window))))
+    (unless (zerop delta)
+      (ignore-errors (window-resize window delta nil nil 'pixelwise))))
+  (set-window-vscroll window 100))
+
+(defun my/palette--keep-hidden (&rest _)
+  "Keep the echo-area copy of a floating minibuffer out of view.
+Events that redraw nothing in the panel, such as the release of the click
+that opened it, can grow the window and reset its scroll, showing the copy."
+  (when-let* ((window (active-minibuffer-window)))
+    (when (buffer-local-value 'my/palette--placement (window-buffer window))
+      (my/palette--hide-copy window))))
+
+;; After every command, before redisplay: also one the minibuffer runs for
+;; such a release.
+(add-hook 'post-command-hook #'my/palette--keep-hidden)
 
 (defun my/palette--refresh ()
   "Redisplay a floating minibuffer that Vertico does not manage."
@@ -837,7 +880,8 @@ It is an `:align-to' position clear of the selected row's rounded end."
           my/palette--editor (my/palette--origin)
           my/palette--width 0
           my/palette--anchor (and (eq my/palette--placement 'point)
-                                  (my/palette--symbol-anchor (my/palette--origin)))
+                                  (or my/palette-anchor
+                                      (my/palette--symbol-anchor (my/palette--origin))))
           my/palette--list (bound-and-true-p vertico--input)
           my/palette--title (my/palette--title))
     (setq-local eldoc-display-functions (list #'my/palette--eldoc-display))
@@ -986,7 +1030,9 @@ comes.  Call it in the minibuffer."
     (when (and active (not (eq active buffer))
                (buffer-local-value 'my/palette--placement active))
       (with-current-buffer active
-        (my/palette--display)))))
+        (my/palette--display)))
+    (unless (and active (buffer-local-value 'my/palette--placement active))
+      (my/palette--hold-echo-area nil))))
 
 (defun my/palette--refit (buffer)
   "Show BUFFER's panel again if its minibuffer is still active.

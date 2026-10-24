@@ -814,6 +814,11 @@ Overlay strings do not take the background of the selection overlay."
     (add-face-text-property 0 (length string) face t string))
   string)
 
+(defvar my/sidebar-name-face-function nil
+  "Function returning a face for an entry's name, or nil for none.
+It is called in the sidebar with the entry's file and whether it is a
+folder; init-git.el colors names by their Git status.")
+
 (defun my/sidebar-row ()
   "Draw the entry on the line at point, if the line lists one."
   (when-let* ((start (dired-move-to-filename))
@@ -864,6 +869,9 @@ Overlay strings do not take the background of the selection overlay."
                          ;; A type's row leaves out its file's extension.
                          ((and icon (not directory-p)) (file-name-sans-extension name))
                          (t name)))
+      (when-let* ((face (and my/sidebar-name-face-function
+                             (funcall my/sidebar-name-face-function file directory-p))))
+        (overlay-put label 'face face))
       (overlay-put label 'my/sidebar-hl selected)
       (when selected (push label my/sidebar-hl-rows))
       (overlay-put label 'pointer 'hand)

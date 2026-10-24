@@ -73,6 +73,8 @@
 (require 'init-jieba-word)
 (require 'init-lsp)
 (require 'init-search)
+;; IntelliJ's Git tools on top of Magit: Commit tool window, change markers.
+(require 'init-git)
 (require 'init-navigation)
 ;; Per-project workspaces and the start page shown without file arguments.
 (require 'init-workspace)

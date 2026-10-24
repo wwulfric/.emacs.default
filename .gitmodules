@@ -73,3 +73,24 @@
 [submodule "lisp/intellij-server"]
 	path = lisp/intellij-server
 	url = git@github.com:wwulfric/intellij-server.el.git
+[submodule "lisp/magit"]
+	path = lisp/magit
+	url = https://github.com/magit/magit.git
+[submodule "lisp/with-editor"]
+	path = lisp/with-editor
+	url = https://github.com/magit/with-editor.git
+[submodule "lisp/llama"]
+	path = lisp/llama
+	url = https://github.com/tarsius/llama.git
+[submodule "lisp/cond-let"]
+	path = lisp/cond-let
+	url = https://github.com/tarsius/cond-let.git
+[submodule "lisp/diff-hl"]
+	path = lisp/diff-hl
+	url = https://github.com/dgutov/diff-hl.git
+[submodule "lisp/transient"]
+	path = lisp/transient
+	url = https://github.com/magit/transient.git
+[submodule "lisp/git-islands"]
+	path = lisp/git-islands
+	url = git@github.com:wwulfric/git-islands.git

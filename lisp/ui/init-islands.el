@@ -3,7 +3,9 @@
 ;;; Commentary:
 ;; As in JetBrains' Islands theme, the frame is a gray canvas holding white
 ;; cards with rounded corners: the editor area, however it is split, is
-;; one card and each side window (the sidebar) another.
+;; one card and the side windows along each edge another: the sidebar, or
+;; the Commit tool window over its message, on the left, and a tool window
+;; along the bottom, whose panes share one card split by fine lines.
 ;; The canvas is the frame's own background, so the transparent macOS
 ;; title bar above the cards and the echo area below them show it; the
 ;; cards reach the frame's left and right edges, which have no tool strips
@@ -109,12 +111,28 @@ canvas, while the minibuffer panel's own frame stays white."
         (my/islands--surface-buffer (window-buffer window))))))
 
 (defun my/islands--side-p (&optional window)
-  "Return non-nil when WINDOW is a side window, a card of its own."
-  (memq (window-parameter window 'window-side) '(left right)))
+  "Return non-nil when WINDOW is a side window, part of its side's card."
+  (memq (window-parameter window 'window-side) '(left right bottom)))
+
+(defun my/islands--card-edges (&optional window)
+  "Return the pixel edges of the card WINDOW is part of.
+The side windows along one edge make one card; the editor area is another."
+  (let ((window (window-normalize-window window))
+        (side (window-parameter window 'window-side)))
+    (if (memq side '(left right bottom))
+        (let ((edges (seq-map #'window-pixel-edges
+                              (seq-filter (lambda (other)
+                                            (eq (window-parameter other 'window-side) side))
+                                          (window-list (window-frame window) 'no-minibuffer)))))
+          (list (apply #'min (mapcar #'car edges)) (apply #'min (mapcar #'cadr edges))
+                (apply #'max (mapcar #'caddr edges)) (apply #'max (mapcar #'cadddr edges))))
+      (window-pixel-edges (window-main-window (window-frame window))))))
 
 (defun my/islands--insets (&optional window)
-  "Return WINDOW's canvas fringes, as (LEFT . RIGHT) pixels."
-  (if (my/islands--side-p window)
+  "Return WINDOW's canvas fringes, as (LEFT . RIGHT) pixels.
+A bottom card's panes keep white fringes: no canvas there."
+  (if (and (my/islands--side-p window)
+           (not (eq (window-parameter window 'window-side) 'bottom)))
       (pcase-let ((`(,left ,right) (window-fringes window)))
         (cons left right))
     '(0 . 0)))
@@ -129,8 +147,7 @@ That is a corner of its card, the editor area or a side window, which faces
 another card rather than the frame's left or right edge."
   (let* ((frame (window-frame window))
          (edges (window-pixel-edges window))
-         (area (if (my/islands--side-p window) edges
-                 (window-pixel-edges (window-main-window frame))))
+         (area (my/islands--card-edges window))
          (side (if right 2 0)))
     (and (= (nth (if top 1 3) edges) (nth (if top 1 3) area))
          (= (nth side edges) (nth side area))
@@ -173,11 +190,15 @@ corner's width blank, and a mode line nothing."
                                      (my/islands--card)
                                      (my/islands--canvas) nil
                                      (if top my/ui-header-ascent 75))))
-           ;; A top row's rule stops a corner's width short of either end,
-           ;; rounded or not, so the rules of all cards line up.
+           ;; A top row's rule stops a corner's width short of either end
+           ;; of its card, rounded or not, so the rules of all cards line up;
+           ;; between panes of one card it runs on to their dividing line.
+           (internal (/= (nth (if right 2 0) (window-pixel-edges))
+                         (nth (if right 2 0) (my/islands--card-edges))))
            (end (or image
-                    (and top (propertize " " 'face '(:box nil :overline nil :underline nil)
-                                         'display `(space :width (,my/islands-radius)))))))
+                    (and top (not internal)
+                         (propertize " " 'face '(:box nil :overline nil :underline nil)
+                                     'display `(space :width (,my/islands-radius)))))))
       (if right
           (concat (propertize " " 'display
                               `(space :align-to (- (+ right right-fringe right-margin)
@@ -207,6 +228,10 @@ corner's width blank, and a mode line nothing."
 (defvar-local my/islands--fringe-cookie nil
   "Face remapping that paints this side window buffer's fringes on the canvas.")
 
+(defvar-local my/islands--gap-cookie nil
+  "Face remapping that lets a bottom card's gap row be as short as the gap.
+A row is at least as tall as its face's font.")
+
 (defun my/islands--apply-windows (frame)
   "Give FRAME's side windows a canvas fringe toward the editor, or remove it.
 With the one-pixel divider it makes the gap between the cards.  The fringe
@@ -217,20 +242,47 @@ at the frame's edge goes, so the card stays white up to it."
         (my/islands--surface-buffer (window-buffer window)))
       (when-let* ((side (my/islands--side-p window)))
         (with-current-buffer (window-buffer window)
-          (if my/islands-mode
-              (let* ((gap (max 1 (1- my/islands-gap)))
-                     (fringes (if (eq (car side) 'left) (list 0 gap) (list gap 0))))
-                (unless my/islands--fringe-cookie
-                  (setq my/islands--fringe-cookie
-                        (face-remap-add-relative 'fringe :background (my/islands--canvas))))
-                (unless (equal (seq-take (window-fringes window) 2) fringes)
-                  (set-window-fringes window (car fringes) (cadr fringes))))
+          (cond
+           ((and my/islands-mode (eq (car side) 'bottom))
+            ;; The gap above is a canvas strip in the window's top row; the
+            ;; card's panes keep a white pixel of right fringe each, so a row
+            ;; filling a pane is not cut and the panes meet at a fine line.
+            (unless (window-parameter window 'tab-line-format)
+              (set-window-parameter window 'tab-line-format '(:eval (my/islands--gap-row))))
+            (unless my/islands--gap-cookie
+              (setq my/islands--gap-cookie
+                    (face-remap-add-relative 'tab-line :height 10 :box nil
+                                             :background (my/islands--canvas))))
+            (unless (equal (seq-take (window-fringes window) 2) '(0 1))
+              (set-window-fringes window 0 1)))
+           (my/islands-mode
+            (let* ((gap (max 1 (1- my/islands-gap)))
+                   (fringes (if (eq (car side) 'left) (list 0 gap) (list gap 0))))
+              (unless my/islands--fringe-cookie
+                (setq my/islands--fringe-cookie
+                      (face-remap-add-relative 'fringe :background (my/islands--canvas))))
+              (unless (equal (seq-take (window-fringes window) 2) fringes)
+                (set-window-fringes window (car fringes) (cadr fringes)))))
+           (t
             (when my/islands--fringe-cookie
               (face-remap-remove-relative my/islands--fringe-cookie)
               (setq my/islands--fringe-cookie nil)
               ;; The sidebar uses the frame's fringes again.
               (when (derived-mode-p 'dired-mode)
-                (set-window-fringes window nil nil)))))))))
+                (set-window-fringes window nil nil)))
+            (when (window-parameter window 'tab-line-format)
+              (set-window-parameter window 'tab-line-format nil))
+            (when my/islands--gap-cookie
+              (face-remap-remove-relative my/islands--gap-cookie)
+              (setq my/islands--gap-cookie nil)))))))))
+
+(defun my/islands--gap-row ()
+  "Return the canvas strip above a bottom card: its gap to the editor.
+With the one-pixel divider it is as wide as the sidebar's gap."
+  (let ((height (max 1 (1- my/islands-gap))))
+    (propertize " " 'face `(:background ,(my/islands--canvas) :box nil
+                            :overline nil :underline nil :height 1)
+                'display `(space :align-to right :height (,height)))))
 
 (defun my/islands--apply-frame (frame)
   "Give top-level FRAME the canvas background and title bar, or remove them."

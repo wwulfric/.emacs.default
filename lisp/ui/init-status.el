@@ -239,6 +239,10 @@ of their own that closing the tab would leave behind."
                    (my/status--flags)))
    (my/ui-space my/status-gap)))
 
+(defvar my/status-right-functions nil
+  "Functions called with the window shown, each returning an item or nil.
+Their items lead the right part of the bar.")
+
 (defun my/status--right (window)
   "Return the right part of the bar for the current buffer, shown in WINDOW."
   (let* ((point (window-point window))
@@ -248,13 +252,15 @@ of their own that closing the tab would leave behind."
          (diagnostics (and (bound-and-true-p lsp-bridge-mode)
                            (bound-and-true-p my/ui-diagnostic-summary))))
     (string-join
-     (delq nil (list (and diagnostics
-                          (my/status--item diagnostics #'my/status-diagnostics
-                                           "List diagnostics"))
-                     (propertize position 'face 'my/status)
-                     (propertize (car encoding) 'face 'my/status-muted)
-                     (propertize (cadr encoding) 'face 'my/status-muted)
-                     (my/status--lock)))
+     (delq nil (append (mapcar (lambda (function) (funcall function window))
+                               my/status-right-functions)
+                       (list (and diagnostics
+                                  (my/status--item diagnostics #'my/status-diagnostics
+                                                   "List diagnostics"))
+                             (propertize position 'face 'my/status)
+                             (propertize (car encoding) 'face 'my/status-muted)
+                             (propertize (cadr encoding) 'face 'my/status-muted)
+                             (my/status--lock))))
      (my/ui-space my/status-gap))))
 
 (defun my/status--lock ()

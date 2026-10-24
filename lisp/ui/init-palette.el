@@ -17,12 +17,14 @@
 ;;     Recent                             1 / 22     title and count
 ;;     🔍 init                                        input
 ;;     ──────────────────────────────────────────     divider
-;;     Buffer                                         group title
-;;   ▎ 📄 init-lsp.el               ~/.emacs.d/lisp/  selected row
-;;     📄 init-completion.el
+;;     BUFFER                                         group title
+;;   ( 📄 init-lsp.el                        lisp )   selected row
+;;     📄 init-completion.el                 lisp
 ;;
 ;; Titles, icons and the footer share an outer column; the input and the
-;; candidates' names an inner one.
+;; candidates' names an inner one.  The selected row is a pill (see Pills
+;; in ui-layout.el), so rows take their heights from struts rather than
+;; from `line-spacing'.
 
 ;;; Code:
 
@@ -32,7 +34,10 @@
 (require 'ui-layout)
 
 (defvar vertico-count)
+(defvar vertico-map)
+(defvar vertico--index)
 (defvar consult-after-jump-hook)
+(declare-function vertico-next "vertico" (&optional n))
 
 (defface my/palette '((t (:inherit default)))
   "Text and background of the floating minibuffer panel."
@@ -58,16 +63,16 @@
   "Tab of the panel's header that is not the current one."
   :group 'faces)
 
-(defface my/palette-tab-active '((t (:inherit highlight)))
-  "Current tab of the panel's header."
+(defface my/palette-tab-active '((t (:underline t)))
+  "Current tab of the panel's header, underlined as the current buffer's tab is."
   :group 'faces)
 
 (defface my/palette-footer '((t (:background "gray96")))
   "Band at the bottom of the panel holding the footer."
   :group 'faces)
 
-(defface my/palette-mark '((t (:background "RoyalBlue")))
-  "Bar at the left of the selected candidate in the panel."
+(defface my/palette-header '((t (:inherit my/palette-footer)))
+  "Band at the top of the panel holding the title or tabs."
   :group 'faces)
 
 (defvar my/palette-placement 'palette
@@ -117,8 +122,10 @@ ElDoc in its footer (see `my/palette--eldoc-display').")
 
 (defvar my/palette-line-spacing
   (if (< emacs-major-version 31) 0.44 '(0.22 . 0.22))
-  "Extra spacing relative to the line height of each row.
-Emacs 31 splits it above and below; older versions put it all below.")
+  "Extra spacing relative to the line height of each row of other popups.
+The input method's candidates and completion menus use it; the panel's
+own rows take their heights from struts.  Emacs 31 splits it above and
+below; older versions put it all below.")
 
 (defconst my/palette-padding (* 3 my/ui-space-small)
   "Horizontal padding inside the panel, in pixels.")
@@ -128,7 +135,7 @@ Emacs 31 splits it above and below; older versions put it all below.")
 
 (defvar my/palette-edge-height 80
   "Height in 1/10 pt of the empty mode line padding the panel's bottom.
-With the rows' own spacing it matches the side padding.")
+It ends a panel that has no footer band.")
 
 (defvar my/palette-header-height 0.85
   "Height of the title line relative to the panel text.")
@@ -147,10 +154,36 @@ With the rows' own spacing it matches the side padding.")
 It holds the title, the search icon, group titles, icons and the footer;
 the input and the candidates' names start at `my/palette-indent'.")
 
-(defconst my/palette-mark-width 3
-  "Width in pixels of the bar marking the selected candidate.")
+(defconst my/palette-pill-radius 6
+  "Radius in pixels of the selected candidate's rounded ends.")
+
+(defconst my/palette-text-end-inset (* 2 my/palette-pill-radius)
+  "Pixels between candidates' right-aligned text and the selection's end.")
+
+(defvar my/palette-row-height 1.85
+  "Height of a candidate row, in frame character units.")
+
+(defvar my/palette-input-padding '(14 . 4)
+  "Pixels above and below the input, as (ABOVE . BELOW).
+BELOW adds to the divider row's upper half, so that the input sits midway
+between the header's band and the divider.  The cursor runs from the top
+of its row, so a strut would lift it off the text; lines this high pad
+the input instead.")
+
+(defvar my/palette-group-row-height 1.6
+  "Height of a group title row, in frame character units.")
+
+(defvar my/palette-divider-height 1.0
+  "Height of the row holding the divider, in frame character units.")
+
+(defun my/palette--strut (height)
+  "Return a strut making its row HEIGHT frame character units high."
+  (my/ui-strut (ceiling (* (frame-char-height) height))))
 
 (declare-function my/completion-icon "init-completion" (candidate))
+
+(defvar my/palette--expected nil
+  "Timer that hides the panel `my/palette-expect' keeps up, or nil.")
 
 (defvar-local my/palette--placement nil
   "Placement of this minibuffer session, or nil when it is not floating.")
@@ -184,6 +217,15 @@ the input and the candidates' names start at `my/palette-indent'.")
 
 (defvar-local my/palette--icon nil
   "Overlay showing the search icon in place of the prompt, or nil.")
+
+(defvar-local my/palette--top nil
+  "Overlay padding the panel above its input, or nil.")
+
+(defvar-local my/palette--bottom nil
+  "Overlay padding a panel without a list below its input, or nil.")
+
+(defvar-local my/palette--top-height 0
+  "Pixels of the padding above the input.")
 
 (defvar-local my/palette--input-start nil
   "Overlay of the space before the input, or nil.")
@@ -254,6 +296,8 @@ window."
 
 (defun my/palette--show ()
   "Display the current minibuffer buffer in its floating panel."
+  ;; The panel kept up for this one stops showing the last one's copy.
+  (my/palette--drop-snapshot)
   (let* ((buffer (current-buffer))
          (input (point))
          (anchor (and (eq my/palette--placement 'point) my/palette--anchor))
@@ -287,9 +331,13 @@ window."
                ;; Its header and mode lines pad the panel (see the setup).
                :respect-header-line t
                :respect-mode-line t
-               ;; Rows breathe without changing the echo area's height.
-               :override-parameters `((line-spacing . ,my/palette-line-spacing))
+               ;; Struts set the rows' heights; spacing would add to them.
+               :override-parameters '((line-spacing . 0))
                :hidehandler #'my/palette--hidehandler)))))
+    ;; The panel shows all of its text.  A window that once scrolled, as when
+    ;; it was too short, would keep starting past the icon and the outline.
+    (unless (= (window-start (frame-root-window frame)) (point-min))
+      (set-window-start (frame-root-window frame) (point-min)))
     (when anchor
       (when (zerop my/palette--width)
         (setq my/palette--width (frame-width frame))))
@@ -342,9 +390,30 @@ so the windows above do not move while the panel is open."
   (unless my/palette--placement
     (apply resize args)))
 
+(defun my/palette--fit (fit posframe &rest args)
+  "Fit POSFRAME as FIT does with ARGS, counting a panel's padding line.
+Fitting measures from the window's start, which leaves out the line an
+overlay string draws above the input.  A panel's height is set in one
+resize: growing it after a fit would show as a flash."
+  (let* ((window (frame-root-window posframe))
+         (buffer (window-buffer window))
+         (padding (and (buffer-local-value 'my/palette--placement buffer)
+                       (buffer-local-value 'my/palette--top-height buffer))))
+    (cond ((not padding) (apply fit posframe args))
+          ;; Only the height is fitted; the width is the panel's own.
+          ((eq (car (last args)) 'vertically)
+           (let ((height (+ (cdr (window-text-pixel-size window nil nil nil nil t))
+                            padding)))
+             (unless (= height (frame-text-height posframe))
+               (set-frame-height posframe height nil t))))
+          (t (apply fit posframe args)
+             (set-frame-height posframe (+ (frame-text-height posframe) padding) nil t)))))
+
 (defun my/palette--hidehandler (info)
-  "Hide a panel described by INFO once its minibuffer is no longer active."
-  (not (minibufferp (cdr (plist-get info :posframe-buffer)) t)))
+  "Hide a panel described by INFO once its minibuffer is no longer active.
+A panel kept up for the next one stays."
+  (and (not my/palette--expected)
+       (not (minibufferp (cdr (plist-get info :posframe-buffer)) t))))
 
 ;;;; Structure
 
@@ -389,6 +458,13 @@ so the windows above do not move while the panel is open."
           (propertize " " 'display '(right-fringe my/palette-edge-right my/palette-edge)))
   "Text that draws the side outline in the fringes of its row.")
 
+(defun my/palette--spacer (height)
+  "Return a line HEIGHT pixels high, with the side outline.
+Its text is tiny, so the strut alone sets its height."
+  (let ((line (concat (my/ui-strut height) "\n")))
+    (add-face-text-property 0 (length line) '(:height 0.1) t line)
+    (concat my/palette--edges line)))
+
 (defun my/palette--line-height (face)
   "Return the height of a header or mode line in FACE, measured once."
   (or (alist-get face my/palette--line-heights nil nil #'eq)
@@ -403,7 +479,8 @@ Its corners are rounded and carry the outline's sides around them."
                     (t my/palette--edge-face))))
     (if (not (and my/palette--outside (display-graphic-p)))
         text
-      (my/ui-rounded-line text my/palette-radius (my/palette--line-height face)
+      (my/ui-rounded-line text my/palette-radius
+                          (my/palette--line-height face)
                           (plist-get face :background) my/palette--outside
                           (face-background 'my/palette-border nil t) top))))
 
@@ -439,8 +516,29 @@ It is shortened from the left to WIDTH columns."
 
 (defun my/palette--banded-p ()
   "Return non-nil when the panel's bottom line is a footer band, not padding.
-A list always has one; a panel without a list, while it has a status."
-  (or my/palette--list my/palette--status))
+A list or tabs always have one; another panel, while it has a status."
+  (or my/palette--list my/palette--tabs my/palette--status))
+
+(defun my/palette--lone-padding ()
+  "Return the pixels below an input that no candidates follow.
+They are as many as the divider's upper half adds, so that the input
+sits as it does above candidates."
+  (+ (cdr my/palette-input-padding)
+     (/ (ceiling (* (frame-char-height) my/palette-divider-height)) 2)))
+
+(defun my/palette--refooter ()
+  "Draw this panel's bottom line as a footer band or as padding, as it has.
+A panel without a list pads its input above a band as an empty list does."
+  (my/palette--remap 'mode-line (if (my/palette--banded-p)
+                                    my/palette--footer-face
+                                  my/palette--edge-face))
+  (when (overlayp my/palette--bottom)
+    (overlay-put my/palette--bottom 'after-string
+                 (when (and (not my/palette--list) (my/palette--banded-p))
+                   (let ((strut (copy-sequence (my/ui-strut (my/palette--lone-padding)))))
+                     (add-face-text-property 0 (length strut) '(:height 0.1) t strut)
+                     ;; The cursor stays on the input, as Vertico keeps it.
+                     (concat (propertize " " 'cursor t) "\n" my/palette--edges strut))))))
 
 (defun my/palette--footer ()
   "Return the bottom line.
@@ -479,9 +577,7 @@ the selected candidate.  Call it in the minibuffer."
       (setq my/palette--status status)
       ;; A panel without a list gains or loses its footer band.
       (unless (eq (and banded t) (and (my/palette--banded-p) t))
-        (my/palette--remap 'mode-line (if (my/palette--banded-p)
-                                          my/palette--footer-face
-                                        my/palette--edge-face))
+        (my/palette--refooter)
         (my/palette--display)))
     (force-mode-line-update t)))
 
@@ -505,6 +601,7 @@ Pickers that are kinds of one search show which kind is open; see
 init-search.el.  Call it in the minibuffer."
   (when my/palette--placement
     (setq my/palette--tabs tabs)
+    (my/palette--refooter)
     ;; Every kind of the search shows the search icon, lists or not.
     (when (overlayp my/palette--icon)
       (overlay-put my/palette--icon 'display (my/palette--search-icon)))
@@ -581,52 +678,137 @@ it in the minibuffer."
 
 (defun my/palette--divider-args (args)
   "Put a line before the candidate lines in ARGS when they show in a panel.
-Every line draws the panel's side outline in the fringes."
+Padding under the input comes first.  Every line draws the panel's side
+outline in the fringes.  Without candidates the input meets the footer;
+it is padded as by the divider's upper half then, so that it stays put
+when candidates come."
   (pcase-let ((`(,lines) args))
-    (if (and my/palette--placement lines)
-        (list (mapcar (lambda (line) (concat my/palette--edges line))
-                      (cons (concat (propertize " " 'face 'my/palette-divider
-                                                'display '(space :align-to right))
-                                    (propertize "\n" 'face 'my/palette-divider))
-                            lines)))
-      args)))
+    (cond
+     ((not my/palette--placement) args)
+     ((not lines)
+      (list (list (my/palette--spacer
+                   (+ (cdr my/palette-input-padding)
+                      (/ (ceiling (* (frame-char-height) my/palette-divider-height)) 2))))))
+     (t
+      (list (cons (my/palette--spacer (cdr my/palette-input-padding))
+                  (mapcar (lambda (line) (concat my/palette--edges line))
+                          (cons (concat
+                                 ;; Centered on the divider's smaller text,
+                                 ;; whose middle the line runs through.
+                                 (propertize (my/palette--strut my/palette-divider-height)
+                                             'face '(:inherit my/palette-divider
+                                                     :strike-through nil))
+                                 (propertize " " 'face 'my/palette-divider
+                                             'display '(space :align-to right))
+                                 (propertize "\n" 'face 'my/palette-divider))
+                                lines))))))))
+
+(defvar my/palette-candidate-map)
 
 (defun my/palette--format-candidate (format cand prefix &rest args)
   "Call FORMAT with CAND, PREFIX and ARGS, indenting panel candidates.
-The indentation holds a bar for the selected candidate, then the icon of a
-file or buffer below the search icon, so that names line up with the input.
-Vertico puts a space before every alignment in a candidate, so the
+The indentation holds the row's strut, or the selected row's rounded left
+end, then the icon of a file or buffer below the search icon, so that
+names line up with the input.  The selected row ends in its rounded right
+end.  Vertico puts a space before every alignment in a candidate, so the
 indentation is made of exact widths instead.  Emoji and symbols are scaled
 to the row, which the panel's height counts on."
-  (apply format (if my/palette--placement (my/ui-fit-tall-glyphs cand) cand)
-         (if my/palette--placement
-             (let* ((icon (and (fboundp 'my/completion-icon)
-                               (my/completion-icon cand)))
-                    (icon-width (if icon (car (image-size (get-text-property
-                                                           0 'display icon)
-                                                          t))
-                                  0))
-                    (mark (when (= (nth 1 args) vertico--index)
-                            (propertize (my/ui-space my/palette-mark-width)
-                                        'face 'my/palette-mark)))
-                    (used (if mark my/palette-mark-width 0)))
-               (concat mark
-                       (when icon
-                         (prog1 (concat (my/ui-space
-                                         (- my/palette-icon-indent used))
-                                        icon)
-                           (setq used (+ my/palette-icon-indent icon-width))))
-                       (my/ui-space (- my/palette-indent used))
-                       prefix))
-           prefix)
-         args))
+  (if (not my/palette--placement)
+      (apply format cand prefix args)
+    (let* ((selected (= (nth 1 args) vertico--index))
+           (height (ceiling (* (frame-char-height) my/palette-row-height)))
+           (color (and selected (face-background 'vertico-current nil t)))
+           (icon (and (fboundp 'my/completion-icon)
+                      (my/completion-icon cand)))
+           (icon-width (if icon (car (image-size (get-text-property 0 'display icon) t))
+                         0))
+           (used (if selected my/palette-pill-radius 1))
+           (line (apply format (my/ui-fit-tall-glyphs cand)
+                        (concat (if selected
+                                    ;; Vertico draws the whole row in the
+                                    ;; selection's face, this end included.
+                                    (my/ui-pill-end 'left my/palette-pill-radius height color
+                                                    nil (face-background 'my/palette nil t))
+                                  (my/ui-strut height))
+                                (when icon
+                                  (prog1 (concat (my/ui-space
+                                                  (- my/palette-icon-indent used))
+                                                 icon)
+                                    (setq used (+ my/palette-icon-indent icon-width))))
+                                (my/ui-space (- my/palette-indent used))
+                                prefix)
+                        args)))
+      ;; A click chooses the candidate, as RET does.
+      (add-text-properties 0 (1- (length line))
+                           `(my/palette-index ,(nth 1 args) keymap ,my/palette-candidate-map)
+                           line)
+      (if (not selected)
+          line
+        ;; Before the newline, which ends every candidate.
+        (concat (substring line 0 -1)
+                (my/ui-pill-right my/palette-pill-radius height color)
+                (substring line -1))))))
+
+;;;; Mouse
+
+;; As in JetBrains' lists, the wheel moves the selection and a click
+;; chooses.  The panel draws only the rows it shows, so there is nothing
+;; to scroll otherwise.  Rows are not highlighted under the pointer: the
+;; highlight of a mouse face lingers in child frames.
+
+(defvar-local my/palette--scrolled 0
+  "Pixels the wheel has turned past the last row it moved the selection by.")
+
+(defun my/palette-scroll (event)
+  "Move the selection a row for each line wheel EVENT scrolls.
+Lines are as long as the system counts them, a frame line; a touchpad
+sends many small turns, which add up until they pass one."
+  (interactive "e")
+  (with-selected-window (active-minibuffer-window)
+    (let ((up (eq (event-basic-type event) 'wheel-up)))
+      (if-let* ((pixels (cdr-safe (nth 4 event)))
+                ((/= pixels 0)))
+          ;; The event's direction follows the system's; its delta need not.
+          (let* ((delta (if up (- (abs pixels)) (abs pixels)))
+                 (row (frame-char-height))
+                 (total (+ delta (if (< (* delta my/palette--scrolled) 0) 0
+                                   my/palette--scrolled)))
+                 (rows (truncate total row)))
+            (setq my/palette--scrolled (- total (* rows row)))
+            (unless (zerop rows)
+              (vertico-next rows)))
+        (vertico-next (if up -1 1))))))
+
+(defun my/palette-choose (event)
+  "Choose the candidate pressed in EVENT, as RET would."
+  (interactive "e")
+  (when-let* ((object (posn-object (event-start event)))
+              ((consp object))
+              (index (get-text-property (cdr object) 'my/palette-index (car object))))
+    (with-selected-window (active-minibuffer-window)
+      (let ((vertico--index index))
+        (call-interactively (keymap-local-lookup "RET"))))))
+
+(defvar-keymap my/palette-candidate-map
+  :doc "Mouse actions on a candidate in the panel."
+  ;; On press, as the tabs act; this also keeps it from starting a drag.
+  "<down-mouse-1>" #'my/palette-choose
+  "<mouse-1>" #'ignore)
 
 (defun my/palette--format-group-title (title)
-  "Indent group TITLE in a panel like the panel title, outside its items."
+  "Indent group TITLE in a panel like the panel title, outside its items.
+It is in capitals, a label rather than an item."
   (if my/palette--placement
-      (concat (my/ui-space-to my/palette-icon-indent)
-              title)
+      (concat (my/palette--strut my/palette-group-row-height)
+              (my/ui-space-to my/palette-icon-indent)
+              (upcase title))
     title))
+
+(defun my/palette-text-end ()
+  "Return where candidates' right-aligned text ends in this panel, or nil.
+It is an `:align-to' position clear of the selected row's rounded end."
+  (when my/palette--placement
+    `(- right (,my/palette-text-end-inset))))
 
 ;;;; Session
 
@@ -639,6 +821,10 @@ to the row, which the panel's height counts on."
              (not (memq this-command my/palette-ignore-commands))
              my/palette-placement))
   (when my/palette--placement
+    ;; This is the panel the last one was kept up for.
+    (when (timerp my/palette--expected)
+      (cancel-timer my/palette--expected)
+      (setq my/palette--expected nil))
     ;; One panel at a time: an enclosing one comes back when this exits
     ;; (see `my/palette--after-exit').
     (when (> (minibuffer-depth) 1)
@@ -657,6 +843,8 @@ to the row, which the panel's height counts on."
     (setq-local eldoc-display-functions (list #'my/palette--eldoc-display))
     (setq-local vertico-count (alist-get my/palette--placement my/palette-rows)
                 truncate-lines t
+                ;; The selected row reaches the edge; the fringes are padding.
+                fringe-indicator-alist (cons '(truncation nil nil) fringe-indicator-alist)
                 auto-hscroll-mode 'current-line
                 ;; The header line holds the title, the mode line the footer
                 ;; of a list or else padding.
@@ -668,6 +856,7 @@ to the row, which the panel's height counts on."
            ;; the mode line; an underline that low lands on the last pixel.
            (top `(:overline ,border :underline nil))
            (bottom `(:overline nil :underline (:color ,border :position 100)))
+           (band (face-background 'my/palette-header nil t))
            (plain `(:box nil :inherit my/ui-font :background ,background))
            (edge `(:height ,my/palette-edge-height ,@bottom ,@plain)))
       (setq my/palette--status nil
@@ -680,21 +869,25 @@ to the row, which the panel's height counts on."
             my/palette--line-heights nil
             my/palette--line-face
             `(:height ,my/palette-header-height ,@top
-                      ,@plain :box (:line-width (0 . ,my/palette-header-padding)
-                                                :color ,background))
+                      :box (:line-width (0 . ,my/palette-header-padding) :color ,band)
+                      :inherit my/ui-font :background ,band)
             my/palette--footer-face
             (let ((band (face-background 'my/palette-footer nil t)))
               `(:height ,my/palette-header-height ,@bottom
                         :inherit my/ui-font :background ,band
                         :box (:line-width (0 . ,my/palette-header-padding)
                                           :color ,band))))
-      (my/palette--remap 'header-line my/palette--line-face)
-      (my/palette--remap 'mode-line (if my/palette--list my/palette--footer-face
-                                      edge)))
+      (my/palette--remap 'header-line my/palette--line-face))
     ;; Interface text in the interface font; pickers keep code in the code
     ;; font (init-completion.el).
     (face-remap-add-relative 'default 'my/ui-font)
-    (overlay-put (make-overlay (point-min) (point-min)) 'before-string my/palette--edges)
+    (setq my/palette--top (make-overlay (point-min) (point-min))
+          my/palette--top-height (car my/palette-input-padding)
+          ;; Advancing both ends keeps it empty after the input.
+          my/palette--bottom (make-overlay (point-max) (point-max) nil t t))
+    (overlay-put my/palette--top 'before-string
+                 (concat (my/palette--spacer my/palette--top-height) my/palette--edges))
+    (my/palette--refooter)
     (let ((start (minibuffer-prompt-end)))
       (when my/palette--title
         (my/palette--replace-prompt my/palette--list))
@@ -718,12 +911,77 @@ Deferred so that a prompt which directly follows reuses the visible panel."
     (select-frame parent t))
   (run-at-time 0 nil #'my/palette--after-exit (current-buffer)))
 
+(defvar my/palette--snapshot nil
+  "Copy of a panel's buffer that its panel shows while kept up, or nil.")
+
+(defun my/palette--frame (buffer)
+  "Return the child frame of BUFFER's panel, or nil."
+  (seq-find (lambda (frame)
+              (and (frame-parent frame)
+                   (eq (cdr (frame-parameter frame 'posframe-buffer)) buffer)))
+            (frame-list)))
+
+(defun my/palette--show-snapshot (buffer)
+  "Show a copy of BUFFER in its panel, which goes on looking as it does.
+The minibuffer itself is reset once it exits."
+  (my/palette--drop-snapshot)
+  (when-let* ((frame (my/palette--frame buffer))
+              ((frame-visible-p frame)))
+    (let ((window (frame-root-window frame))
+          (copy (with-current-buffer buffer (clone-buffer " *palette-snapshot*"))))
+      ;; Cloning copies the text and the local variables, not overlays.
+      (with-current-buffer buffer
+        (dolist (overlay (reverse (overlays-in (point-min) (point-max))))
+          (let ((twin (make-overlay (overlay-start overlay) (overlay-end overlay) copy))
+                (props (overlay-properties overlay)))
+            (while props
+              (overlay-put twin (pop props) (pop props))))))
+      (setq my/palette--snapshot copy)
+      (set-window-dedicated-p window nil)
+      (set-window-buffer window copy t)
+      (set-window-start window (with-current-buffer copy (point-min)))
+      (set-window-point window (with-current-buffer copy (point)))
+      (set-window-dedicated-p window t))))
+
+(defun my/palette--drop-snapshot ()
+  "Give a panel showing a snapshot its own buffer back."
+  (when (buffer-live-p my/palette--snapshot)
+    (dolist (frame (frame-list))
+      (let ((window (frame-root-window frame)))
+        (when (eq (window-buffer window) my/palette--snapshot)
+          (set-window-dedicated-p window nil)
+          (set-window-buffer window (cdr (frame-parameter frame 'posframe-buffer)) t)
+          (set-window-dedicated-p window t))))
+    (kill-buffer my/palette--snapshot))
+  (setq my/palette--snapshot nil))
+
+(defun my/palette-expect ()
+  "Keep the panel up for a minibuffer about to replace the current one.
+Its command may work before it reads, or read from a callback, as a
+search switching kinds does; the panel then goes on showing a copy of
+this one rather than flashing.  It hides after a second if no panel
+comes.  Call it in the minibuffer."
+  (when (timerp my/palette--expected)
+    (cancel-timer my/palette--expected))
+  (my/palette--show-snapshot (current-buffer))
+  (setq my/palette--expected
+        (run-at-time 1 nil #'my/palette--unexpect (current-buffer))))
+
+(defun my/palette--unexpect (buffer)
+  "Stop keeping BUFFER's panel up for another, hiding it unless it is in use."
+  (when (timerp my/palette--expected)
+    (cancel-timer my/palette--expected))
+  (setq my/palette--expected nil)
+  (my/palette--drop-snapshot)
+  (my/palette--after-exit buffer))
+
 (defun my/palette--after-exit (buffer)
   "Hide BUFFER's panel unless it is active again; show an enclosing one."
   (let* ((window (active-minibuffer-window))
          (active (and window (window-buffer window))))
-    (unless (and (eq active buffer)
-                 (buffer-local-value 'my/palette--placement buffer))
+    (unless (or my/palette--expected
+                (and (eq active buffer)
+                     (buffer-local-value 'my/palette--placement buffer)))
       (posframe-hide buffer))
     (when (and active (not (eq active buffer))
                (buffer-local-value 'my/palette--placement active))
@@ -750,11 +1008,7 @@ the list updates, but a panel without one has only this."
 
 (defun my/palette--frame-height (buffer)
   "Return the pixel height of BUFFER's panel, or nil when it has none."
-  (when-let* ((frame (seq-find (lambda (frame)
-                                 (and (frame-parent frame)
-                                      (eq (window-buffer (frame-root-window frame))
-                                          buffer)))
-                               (frame-list))))
+  (when-let* ((frame (my/palette--frame buffer)))
     (frame-pixel-height frame)))
 
 (defun my/palette-active-placement ()
@@ -791,6 +1045,9 @@ start of the text; let it happen first, or it undoes the hiding."
       (progn
         (add-hook 'minibuffer-setup-hook #'my/palette--setup 50)
         (add-hook 'minibuffer-exit-hook #'my/palette--nested-exit)
+        (advice-add 'posframe--fit-frame-to-buffer :around #'my/palette--fit)
+        (keymap-set vertico-map "<wheel-up>" #'my/palette-scroll)
+        (keymap-set vertico-map "<wheel-down>" #'my/palette-scroll)
         (advice-add 'vertico--display-candidates :after #'my/palette--after-candidates)
         (advice-add 'vertico--resize-window :around #'my/palette--vertico-resize)
         (advice-add 'vertico--display-candidates :filter-args
@@ -807,6 +1064,9 @@ start of the text; let it happen first, or it undoes the hiding."
                                                consult-after-jump-hook)))))))
     (remove-hook 'minibuffer-setup-hook #'my/palette--setup)
     (remove-hook 'minibuffer-exit-hook #'my/palette--nested-exit)
+    (advice-remove 'posframe--fit-frame-to-buffer #'my/palette--fit)
+    (keymap-unset vertico-map "<wheel-up>")
+    (keymap-unset vertico-map "<wheel-down>")
     (advice-remove 'vertico--display-candidates #'my/palette--after-candidates)
     (advice-remove 'vertico--resize-window #'my/palette--vertico-resize)
     (advice-remove 'vertico--display-candidates #'my/palette--divider-args)

@@ -18,6 +18,7 @@
 ;;; Code:
 
 (declare-function my/palette-set-tabs "init-palette" (tabs))
+(declare-function my/palette-expect "init-palette" ())
 (declare-function my/palette-set-prefix "init-palette" (prefix))
 (declare-function my/palette-set-action "init-palette" (key description))
 (declare-function my/file-symbols "init-lsp" ())
@@ -57,7 +58,10 @@
 ;;;; Switching
 
 (defun my/search--switch (kind input)
-  "Close this search window and open it on KIND with INPUT."
+  "Close this search window and open it on KIND with INPUT.
+The panel stays up for KIND, whose command may read only later."
+  (when (fboundp 'my/palette-expect)
+    (my/palette-expect))
   (throw 'my/search-switch (list kind input)))
 
 (defun my/search--run (kind input &optional command)
@@ -131,9 +135,11 @@ Text searches keep it: they may start with any character."
                    (lambda () (interactive)
                      (my/search--switch kind (minibuffer-contents-no-properties))))
        (define-key map [header-line mouse-1] #'ignore)
+       ;; No mouse face: a highlight box lingers in child frames, and the
+       ;; hand pointer already marks the tabs.
        (propertize label
                    'face (if (eq kind current) 'my/palette-tab-active 'my/palette-tab)
-                   'mouse-face 'highlight 'pointer 'hand 'local-map map
+                   'pointer 'hand 'local-map map
                    'help-echo (if prefix
                                   (format "Search %s, or type %s" (downcase label) prefix)
                                 (format "Search %s" (downcase label))))))

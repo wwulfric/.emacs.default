@@ -49,17 +49,80 @@ Mixed lists such as `consult-buffer' tag each candidate with its own."
       (cons (completion-metadata-get vertico--metadata 'category) candidate)))
 
 (declare-function my/palette-text-width "init-palette" ())
+(declare-function my/palette-text-end "init-palette" ())
+
+(defconst my/completion-annotation-height 0.85
+  "Height of detailed annotations relative to the candidates.")
+
+(defvar-local my/completion--roots nil
+  "Project roots of directories, cached for this minibuffer, or nil.")
+
+(defun my/completion--root (directory)
+  "Return the root of DIRECTORY's project, or nil; remote ones are not looked up."
+  (unless my/completion--roots
+    (setq my/completion--roots (make-hash-table :test #'equal)))
+  (with-memoization (gethash directory my/completion--roots)
+    (unless (file-remote-p directory)
+      (when-let* ((project (project-current nil directory)))
+        (file-name-as-directory (expand-file-name (project-root project)))))))
+
+(defun my/completion--forget-roots ()
+  "Look up project roots afresh in this minibuffer, whose buffer is reused."
+  (setq my/completion--roots nil))
+(add-hook 'minibuffer-setup-hook #'my/completion--forget-roots)
+
+(defun my/completion--current-root ()
+  "Return the root of the project the minibuffer was opened in, or nil.
+It is the frame's workspace (init-workspace.el), else the project of the
+buffer that was current."
+  (let ((window (minibuffer-selected-window)))
+    (if-let* ((root (and window (frame-parameter (window-frame window) 'my/workspace-root))))
+        (file-name-as-directory (expand-file-name root))
+      (my/completion--root
+       (expand-file-name (buffer-local-value 'default-directory
+                                             (window-buffer (or window (selected-window)))))))))
+
+(defun my/completion--short-directory (directory)
+  "Return DIRECTORY as a candidate shows it.
+In the current project it is relative to the project's root, and empty
+at the root; in another project it starts with that project's name.
+Elsewhere it is abbreviated, and relative directories stay as they are."
+  (if (not (file-name-absolute-p directory))
+      (directory-file-name directory)
+    (let* ((directory (file-name-as-directory (expand-file-name directory)))
+           (root (my/completion--root directory)))
+      (directory-file-name
+       (cond ((not root) (abbreviate-file-name directory))
+             ((equal root (my/completion--current-root))
+              (if (equal root directory) "" (file-relative-name directory root)))
+             (t (concat (file-name-nondirectory (directory-file-name root)) "/"
+                        (file-relative-name directory root))))))))
+
+(defun my/completion--text-end ()
+  "Return the `:align-to' position where right-aligned candidate text ends.
+Marginalia runs annotators in the original buffer, so ask the minibuffer."
+  (or (when-let* (((fboundp 'my/palette-text-end))
+                  (window (active-minibuffer-window)))
+        (with-current-buffer (window-buffer window)
+          (my/palette-text-end)))
+      'right))
 
 (defun my/completion--after-name (name directory)
-  "Return NAME followed by DIRECTORY, faded and shortened from the left to fit."
+  "Return NAME with DIRECTORY at the right, faded, smaller and shortened from
+the left to fit.  DIRECTORY is shown as `my/completion--short-directory' says."
   (let* ((room (or (and (fboundp 'my/palette-text-width) (my/palette-text-width))
                    80))
-         (width (max 12 (- room (string-width name) 4)))
-         (directory (if (> (string-width directory) width)
-                        (concat "…" (substring directory (- 1 width)))
-                      (copy-sequence directory))))
-    (add-face-text-property 0 (length directory) 'shadow t directory)
-    (concat name "  " directory)))
+         (width (max 12 (- room (string-width name) 6)))
+         (directory (copy-sequence
+                     (my/ui-fit-left (my/completion--short-directory directory) width))))
+    (if (string-empty-p directory)
+        name
+      (add-face-text-property 0 (length directory) 'shadow t directory)
+      (add-face-text-property 0 (length directory)
+                              `(:height ,my/completion-annotation-height) t directory)
+      (concat name
+              (my/ui-right-space directory (my/completion--text-end) (current-buffer))
+              directory))))
 
 (defun my/completion-name-first (candidate)
   "Return file CANDIDATE as its name followed by its faded directory.
@@ -131,9 +194,6 @@ shows it below the list.  Other pickers put it in the
                                          (my/completion--buffer-directory target))))
                      (abbreviate-file-name file)))))))
 
-(defconst my/completion-annotation-height 0.85
-  "Height of detailed annotations relative to the candidates.")
-
 (defun my/completion--quiet-annotation (suffix)
   "Return the Marginalia annotation SUFFIX smaller, aligned right by pixels.
 Marginalia aligns by columns, which a smaller or proportional font
@@ -146,7 +206,8 @@ breaks."
         (put-text-property align (1+ align) 'display
                            (get-text-property
                             0 'display (my/ui-right-space (substring suffix (1+ align))
-                                                          nil (current-buffer)))
+                                                          (my/completion--text-end)
+                                                          (current-buffer)))
                            suffix)
         suffix)
     suffix))
@@ -159,7 +220,10 @@ interface font (init-palette.el)."
   (pcase-let ((`(,category . ,target) (my/completion--category candidate)))
     (pcase category
       ((or 'file 'project-file)
-       (setq candidate (my/completion-name-first candidate)))
+       ;; The icon is the file's, not that of the directory now at the end.
+       (let ((icon (expui-icons-name-for-file candidate)))
+         (setq candidate (copy-sequence (my/completion-name-first candidate)))
+         (put-text-property 0 (length candidate) 'my/completion-icon icon candidate)))
       ('buffer
        (when-let* ((directory (my/completion--buffer-directory target)))
          (setq candidate (my/completion--after-name
@@ -224,7 +288,7 @@ The list may use a proportional font, so the keys align by pixels."
               (key (and (commandp symbol)
                         (where-is-internal symbol nil 'first-only))))
     (let ((keys (my/completion-keys key)))
-      (my/ui-at-right keys))))
+      (my/ui-at-right keys (my/completion--text-end)))))
 
 (defun my/completion-annotate-buffer (cand)
   "Annotate buffer CAND with a dot if its file is modified."

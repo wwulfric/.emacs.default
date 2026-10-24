@@ -229,49 +229,34 @@ The row's text stays centered in it."
      (format "<svg xmlns='http://www.w3.org/2000/svg' width='1' height='%d'/>"
              height))))
 
-(defun my/ui-pill-end (side radius height color &optional margin outside row line)
+(defun my/ui-pill-end (side radius height color &optional margin outside)
   "Return a string showing the SIDE end of a pill, RADIUS pixels round.
 SIDE is `left' or `right'.  The end fills a row HEIGHT pixels high in
 COLOR, and also sets the row's height as `my/ui-strut' does.  MARGIN
 pixels, 0 by default, stay clear outside it: the string is MARGIN plus
 RADIUS pixels wide.  The clear part shows OUTSIDE, or else the image's
 background, which is that of the face the string is drawn in: pass
-OUTSIDE when that face may be the selection's own.
-
-ROW, a height in pixels, makes the image that tall instead, with the
-pill centered in it, and ignores the row's box, overline and underline,
-as `my/ui-corner' does: a pill in a header or mode line.  LINE then
-draws a one-pixel line along its top, continuing the row's overline."
+OUTSIDE when that face may be the selection's own."
   (let ((margin (or margin 0)))
-    (with-memoization (gethash (list side radius height color margin outside row line)
+    (with-memoization (gethash (list side radius height color margin outside)
                                my/ui--pill-cache)
-      (let* ((width (+ margin radius))
-             (total (or row height))
-             (top (/ (- total height) 2))
-             (bottom (+ top height))
-             (image (my/ui--image-string
-                     (format "<svg xmlns='http://www.w3.org/2000/svg' width='%d' height='%d'>\
-%s<path d='%s' fill='%s'/>%s</svg>"
-                             width total
-                             (if outside
-                                 (format "<rect width='%d' height='%d' fill='%s'/>"
-                                         width total (my/ui--svg-color outside))
-                               "")
-                             (if (eq side 'left)
-                                 (format "M%d,%d A%d,%d 0 0 0 %d,%d V%d A%d,%d 0 0 0 %d,%d Z"
-                                         width top radius radius margin (+ top radius)
-                                         (- bottom radius) radius radius width bottom)
-                               (format "M0,%d A%d,%d 0 0 1 %d,%d V%d A%d,%d 0 0 1 0,%d Z"
-                                       top radius radius radius (+ top radius)
-                                       (- bottom radius) radius radius bottom))
-                             (my/ui--svg-color color)
-                             (if line
-                                 (format "<rect width='%d' height='1' fill='%s'/>"
-                                         width (my/ui--svg-color line))
-                               "")))))
-        (if row
-            (propertize image 'face '(:box nil :overline nil :underline nil))
-          image)))))
+      (let ((width (+ margin radius)))
+        (my/ui--image-string
+         (format "<svg xmlns='http://www.w3.org/2000/svg' width='%d' height='%d'>\
+%s<path d='%s' fill='%s'/></svg>"
+                 width height
+                 (if outside
+                     (format "<rect width='%d' height='%d' fill='%s'/>"
+                             width height (my/ui--svg-color outside))
+                   "")
+                 (if (eq side 'left)
+                     (format "M%d,0 A%d,%d 0 0 0 %d,%d V%d A%d,%d 0 0 0 %d,%d Z"
+                             width radius radius margin radius
+                             (- height radius) radius radius width height)
+                   (format "M0,0 A%d,%d 0 0 1 %d,%d V%d A%d,%d 0 0 1 0,%d Z"
+                           radius radius radius radius
+                           (- height radius) radius radius height))
+                 (my/ui--svg-color color)))))))
 
 (defun my/ui-pill-right (radius height color &optional margin edge)
   "Return the right end of a pill in COLOR, reaching EDGE from the text before.

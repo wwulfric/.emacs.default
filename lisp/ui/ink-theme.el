@@ -143,13 +143,11 @@
    `(my/palette-border ((t (:background ,border))))
    `(my/palette-title ((t (:foreground ,structure))))
    `(my/palette-divider ((t (:strike-through ,section-rule :height 0.5))))
-   `(my/palette-mark ((t (:background ,accent))))
    `(my/palette-footer ((t (:background ,surface))))
    `(my/palette-tab ((t (:foreground ,muted))))
-   `(my/palette-tab-active ((t (:foreground ,accent
-                                :underline (:color ,accent :position 5)))))
+   `(my/palette-tab-active ((t (:foreground ,fg :underline (:color ,accent :position t)))))
    `(minibuffer-nonselected ((t (:foreground ,muted))))
-   `(vertico-current ((t (:foreground ,accent :background ,selection :extend t))))
+   `(vertico-current ((t (:background ,selection :extend t))))
    `(vertico-group-title ((t (:foreground ,muted :slant normal :height 0.85))))
    `(vertico-group-separator ((t (:foreground ,section-rule :strike-through t))))
    ;; Color alone: a bold glyph is taller and wider, so rows would jump.

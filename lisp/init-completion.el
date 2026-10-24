@@ -237,14 +237,28 @@ interface font (init-palette.el)."
 
 ;;;; Matching
 
-;; "ui pal" finds lisp/ui/init-palette.el; initials such as "pff" find
-;; project-find-file.  File names try partial completion (/u/s/l) first.
+;; "ui pal" finds lisp/ui/init-palette.el; word prefixes such as "evp" find
+;; eval-print-last-sexp, and initials such as "pff" project-find-file.
+;; File names try partial completion (/u/s/l) first.
+
+(defun my/completion-word-prefixes (component)
+  "Match COMPONENT as prefixes of successive words, as JetBrains does.
+Each character continues the word matched so far or starts a later one:
+\"evp\" finds eval-print, and initials, one character a word, still
+match.  Each character is a group, which orderless highlights alone."
+  (when (> (length component) 0)
+    (concat "\\<\\(" (regexp-quote (substring component 0 1)) "\\)"
+            (mapconcat (lambda (char)
+                         (let ((char (regexp-quote (string char))))
+                           (concat "\\(?:\\(" char "\\)\\|.*\\<\\(" char "\\)\\)")))
+                       (substring component 1) ""))))
+
 (setq completion-styles '(orderless basic)
       completion-category-defaults nil
       completion-category-overrides '((file (styles partial-completion)))
       completion-pcm-leading-wildcard t
       orderless-matching-styles '(orderless-literal orderless-regexp
-                                  orderless-initialism))
+                                  my/completion-word-prefixes))
 
 ;; Results already matched by another program, e.g. a language server.
 (defun my/completion-passthrough-try (string _table _predicate point)

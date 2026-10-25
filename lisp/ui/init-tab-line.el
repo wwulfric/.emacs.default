@@ -110,6 +110,28 @@ Process buffers can be created without running a major-mode hook."
       (concat (apply #'propertize (expui-icons-icon-for-buffer tab) props)
               (apply #'propertize " " 'display '(space :width (5)) props)))))
 
+(defun my/tab-line-close-slot (visible)
+  "Return a close button or an equally wide empty slot when not VISIBLE."
+  (let* ((image (and (expui-icons-svg-p)
+                     (expui-icons-image "general/closeSmall")))
+         (glyph (if image (propertize " " 'display image) "×"))
+         (blank (cond
+                 (image
+                  (propertize " " 'display
+                              `(space :width (,(car (image-size image t))))))
+                 ((display-graphic-p)
+                  (propertize " " 'display
+                              `(space :width
+                                      (,(string-pixel-width
+                                         (propertize glyph 'face 'tab-line))))))
+                 (t " "))))
+    ;; Keep the surrounding padding identical in both states.  A character
+    ;; count alone cannot reserve the width of an image or a proportional glyph.
+    (propertize (concat " " (if visible glyph blank) " ")
+                'keymap (if visible tab-line-tab-close-map tab-line-tab-map)
+                'help-echo (if visible "Click to close tab" "Click to select tab")
+                'follow-link 'ignore)))
+
 (defun my/tab-line-format-with-padding (tab tabs)
   "Add clickable padding around the standard TAB label and close button."
   (let* ((selected (if (bufferp tab) (eq tab (window-buffer))
@@ -120,11 +142,7 @@ Process buffers can be created without running a major-mode hook."
          ;; Reserve a slot so showing the close button does not shift tabs.
          ;; The hidden slot selects the tab; it must never close it.
          (tab-line-close-button-show t)
-         (tab-line-close-button
-          (propertize (if show-close " × " "   ")
-                      'keymap (if show-close tab-line-tab-close-map tab-line-tab-map)
-                      'help-echo (if show-close "Click to close tab" "Click to select tab")
-                      'follow-link 'ignore))
+         (tab-line-close-button (my/tab-line-close-slot show-close))
          (label (tab-line-tab-name-format-default tab tabs))
          padding)
     (when (and (bufferp tab)

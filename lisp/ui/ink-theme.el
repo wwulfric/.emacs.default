@@ -261,6 +261,10 @@
    '(markdown-url-face ((t (:inherit my-writing-path))))
    '(markdown-plain-url-face ((t (:inherit my-writing-path))))
    ;; Diffs and diagnostics should remain recognizable without vivid chrome.
+   ;; Fringe markers use only the existing 3 px bar, without diff block fills.
+   '(diff-hl-insert ((t (:inherit fringe :foreground "#8FBE8A"))))
+   '(diff-hl-change ((t (:inherit fringe :foreground "#88ADF7"))))
+   '(diff-hl-delete ((t (:inherit fringe :foreground "#D98F8F"))))
    `(diff-added ((t (:foreground ,green :background "#EDF5ED" :extend t))))
    `(diff-removed ((t (:foreground ,red :background "#FBECEE" :extend t))))
    `(diff-changed ((t (:foreground ,amber :background "#FAF3E5" :extend t))))

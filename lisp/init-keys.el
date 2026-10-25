@@ -273,6 +273,9 @@ does there instead of running."
           (call-interactively command))))))
 
 (keymap-global-set "s-?" #'my/keys-reference)
+;; Command+Shift+/ can arrive as an explicitly shifted slash on macOS.
+;; Without this binding, Emacs drops Shift and runs s-/'s comment command.
+(keymap-global-set "S-s-/" #'my/keys-reference)
 
 ;;;; The key promoter
 

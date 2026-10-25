@@ -436,7 +436,10 @@ descriptions line up; columns are as many as fit, at most three."
 (dotimes (index 9)
   (let ((n (1+ index)))
     (keymap-set my/welcome-mode-map (number-to-string n)
-                (lambda () (interactive) (my/welcome-open-nth n)))))
+                (lambda ()
+                  "Open the project or file with this number."
+                  (interactive)
+                  (my/welcome-open-nth n)))))
 
 (put 'my/welcome-mode 'tab-line-exclude t)
 

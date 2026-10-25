@@ -19,6 +19,7 @@
 ;; this configuration answers with its sidebar, islands, palette and status bar.
 
 (declare-function my/sidebar-status-line "init-sidebar" ())
+(declare-function my/keys-remember "init-keys" (symbol))
 (declare-function my/sidebar-width "init-sidebar" ())
 (declare-function my/sidebar-hide "init-sidebar" (&optional frame))
 (declare-function my/islands--header "init-islands" (format))
@@ -155,6 +156,8 @@
 (require 'diff-hl-show-hunk)
 (require 'diff-hl-show-hunk-inline)
 (require 'diff-hl-show-hunk-posframe)
+;; The shortcut reference (init-keys.el) lists only the keys added below.
+(my/keys-remember 'diff-hl-mode-map)
 
 ;; The hunk popup's buffers are internal: a leading space keeps them out of
 ;; the editor's tabs, where diff-hl's buffer switching would leave them.

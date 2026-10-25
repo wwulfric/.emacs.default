@@ -1233,7 +1233,8 @@ ACTION runs in the clicked sidebar; see `my/sidebar-buttons'."
         (interactive "e")
         (select-window (posn-window (event-start event)))
         (if (commandp action)
-            (call-interactively action)
+            ;; As if typed, for the key promoter (init-keys.el) and repeats.
+            (call-interactively (setq this-command action))
           (funcall action event))))
     (define-key map [header-line mouse-1] #'ignore)
     (propertize (apply #'concat strings)

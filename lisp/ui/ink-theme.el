@@ -128,6 +128,13 @@
    `(git-islands-ref-local ((t (:foreground ,green))))
    `(git-islands-ref-remote ((t (:foreground ,syntax-purple))))
    `(git-islands-ref-tag ((t (:foreground ,syntax-function))))
+   ;; which-key (init-keys.el): keys and prefixes stand out, commands are text.
+   `(which-key-key-face ((t (:foreground ,accent))))
+   `(which-key-separator-face ((t (:foreground ,section-rule))))
+   `(which-key-command-description-face ((t (:foreground ,fg))))
+   `(which-key-group-description-face ((t (:foreground ,accent))))
+   `(which-key-local-map-description-face ((t (:foreground ,fg))))
+   `(which-key-note-face ((t (:foreground ,muted))))
    `(dired-directory ((t (:foreground ,fg :weight bold))))
    `(dired-symlink ((t (:foreground ,green))))
    '(dired-flagged ((t (:inherit error))))

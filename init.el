@@ -20,6 +20,10 @@
 ;; Personal display configuration lives together; vendor paths stay unchanged.
 (add-to-list 'load-path (expand-file-name "ui" emacs-root-dir))
 
+;; Before anything binds a key: the shortcut reference lists the keys that
+;; differ from Emacs's own, which it remembers as it loads.
+(require 'init-keys)
+
 ;; The initial frame exists before this file loads.  Show the start page's
 ;; empty buffer during startup so *scratch* never flashes; file arguments
 ;; replace it as usual (see `my/workspace-startup').

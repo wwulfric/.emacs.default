@@ -7,18 +7,21 @@
   (global-set-key (kbd "s-v") #'yank))
 
 ;; 下方新增一行
-(global-set-key (kbd "<S-return>") (lambda ()
-				     (interactive)
-				     (end-of-line)
-				     (newline-and-indent)))
+(defun my-open-line-below ()
+  "Start a new, indented line below the current one."
+  (interactive)
+  (end-of-line)
+  (newline-and-indent))
+(global-set-key (kbd "<S-return>") #'my-open-line-below)
 ;; 上方新增一行
-(global-set-key (kbd "<C-return>") 
-                (lambda ()
-                  (interactive)
-                  (unless (= (line-number-at-pos) 1)
-                    (previous-line))
-                  (end-of-line)
-                  (newline-and-indent)))
+(defun my-open-line-above ()
+  "Start a new, indented line above the current one."
+  (interactive)
+  (unless (= (line-number-at-pos) 1)
+    (previous-line))
+  (end-of-line)
+  (newline-and-indent))
+(global-set-key (kbd "<C-return>") #'my-open-line-above)
 
 (defun my-delete-whole-line ()
   "Delete the current line without copying to kill ring."
@@ -26,14 +29,11 @@
   (delete-region (line-beginning-position) 
                  (1+ (line-end-position))))
 ;; 删除整行
-(global-set-key (kbd "<s-backspace>") (lambda ()
-				  (interactive)
-				  ;; (kill-whole-line)
-                                  (my-delete-whole-line)
-                                  ))
+(global-set-key (kbd "<s-backspace>") #'my-delete-whole-line)
 
 ;; kill buffer
 (defun custom/kill-this-buffer ()
+  "Kill the current buffer without asking which."
   (interactive) (kill-buffer (current-buffer)))
 (global-set-key (kbd "C-x k") 'custom/kill-this-buffer)
 

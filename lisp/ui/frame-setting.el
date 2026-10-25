@@ -19,6 +19,13 @@ use it; code, keys and line numbers there stay in the code font."
                      (font . "PT Mono 14")))
   (setf (alist-get (car parameter) default-frame-alist) (cdr parameter)))
 
+;; A maximized or full-screen frame fills the screen to the pixel instead of
+;; a whole number of rows, which left a strip at the bottom; and changing a
+;; font, fringe or bar never resizes the frame to keep its rows and columns,
+;; which shrank a maximized frame that then could not be maximized again.
+(setq frame-resize-pixelwise t
+      frame-inhibit-implied-resize t)
+
 ;; Window chrome reaches the frame edges; each content area owns its padding.
 ;; Completion and input-method child frames keep their own borders.
 (defun my/frame-apply-spacing (frame)

@@ -64,7 +64,7 @@
 (require 'init-fingertip)
 (require 'init-treesit)
 (require 'init-writing)
-(require 'init-emacs-rime)
+;; Rime is disabled by default; load init-emacs-rime manually to opt in.
 ;; Ink owns face styling; component configs own layout and interaction.
 (add-to-list 'custom-theme-load-path (expand-file-name "ui" emacs-root-dir))
 (load-theme 'ink t)
@@ -85,6 +85,8 @@
 (require 'init-welcome)
 
 (require 'exec-path-from-shell)
+;; .zprofile supplies tool paths; skip interactive shell plugins in .zshrc.
+(setq exec-path-from-shell-arguments '("-l"))
 (dolist (var '("SSH_AUTH_SOCK" "SSH_AGENT_PID" "GPG_AGENT_INFO" "LANG" "LC_CTYPE" "NIX_SSL_CERT_FILE" "NIX_PATH"))
   (add-to-list 'exec-path-from-shell-variables var))
 (when (memq window-system '(mac ns x))

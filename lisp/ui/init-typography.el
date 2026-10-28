@@ -113,14 +113,18 @@ Reloading replaces only our own rule and preserves pre-existing rules."
           ;; This only chooses non-ASCII fallback; code retains its current font.
           (set-face-attribute 'default frame :fontset fixed-fontset))))))
 
-(defun my/typography-refresh (&optional _theme)
+(defun my/typography-refresh (&optional theme)
   "Apply font roles to existing frames, including after a theme reload."
-  (dolist (frame (frame-list))
-    (my/typography-apply frame)))
+  ;; Loading a theme can first enable `user' while recording face defaults.
+  ;; Wait for the requested theme instead of initializing fonts in both hooks.
+  (unless (eq theme 'user)
+    (dolist (frame (frame-list))
+      (my/typography-apply frame))))
 
 (add-hook 'after-make-frame-functions #'my/typography-apply)
 (add-hook 'enable-theme-functions #'my/typography-refresh)
-(my/typography-refresh)
+;; init.el loads Ink next.  Its theme hook initializes existing frames once,
+;; after face styling, instead of enumerating fonts and making fontsets twice.
 
 (provide 'init-typography)
 ;;; init-typography.el ends here

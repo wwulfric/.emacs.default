@@ -114,6 +114,10 @@ Otherwise call ORIGINAL with FILENAME, FILEHOST and POSITION to jump."
 ;; (setq lsp-bridge-enable-hover-diagnostic t)
 
 ;; python
+;; Language selection already follows python-mode/python-ts-mode.  The
+;; basedpyright.json and ruff.json overrides in `lsp-bridge-user-langserver-dir'
+;; use tools installed in Emacs's .venv without changing the global PATH.
+;; This tool environment is separate from the project's Python interpreter.
 (setq lsp-bridge-python-lsp-server "ruff")
 (setq lsp-bridge-python-multi-lsp-server "basedpyright_ruff")
 

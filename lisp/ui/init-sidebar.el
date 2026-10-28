@@ -1130,8 +1130,16 @@ POSITION is from `mouse-pixel-position'."
   (let* ((frame (car position))
          (child (and my/sidebar-name-shown
                      (get-buffer-window my/sidebar-name-buffer t)))
-         (posn (and (frame-live-p frame) (cadr position)
-                    (not (frame-parent frame))
+         ;; Resolve the window without laying out its text first.  Precise
+         ;; hit testing over code/Git panes can otherwise interrupt scrolling
+         ;; every time the sidebar's hover timer fires.
+         (candidate (and (frame-live-p frame)
+                         (integerp (cadr position)) (integerp (cddr position))
+                         (>= (cadr position) 0) (>= (cddr position) 0)
+                         (not (frame-parent frame))
+                         (window-at-x-y (cadr position) (cddr position) frame)))
+         (posn (and candidate
+                    (buffer-local-value 'my/sidebar-mode (window-buffer candidate))
                     (posn-at-x-y (cadr position) (cddr position) frame)))
          (window (and posn (posn-window posn)))
          (point (and posn (posn-point posn))))

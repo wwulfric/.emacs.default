@@ -57,6 +57,12 @@ use it; code, keys and line numbers there stay in the code font."
 (window-divider-mode 1)
 
 ;; Number code buffers only; reading and utility buffers stay uncluttered.
+(require 'display-line-numbers)
+;; Reserve room for the whole buffer before display, so scrolling across
+;; 9/10 or 99/100 never shifts the text.  Keep any width gained while editing.
+(setq-default display-line-numbers-width-start t
+              display-line-numbers-grow-only t)
+
 ;; Remove the previous global policy when this file is reloaded.
 (remove-hook 'display-line-numbers-mode-hook 'my/line-numbers-exclude-dired)
 (global-display-line-numbers-mode -1)

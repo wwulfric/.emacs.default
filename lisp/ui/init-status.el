@@ -417,11 +417,40 @@ minibuffer closes, so this runs again then."
 (defvar my/status--timer nil
   "Timer refreshing what changes without a command, such as diagnostics.")
 
+(defvar my/status--scroll-timer nil
+  "Pending status refresh after touchpad or wheel scrolling settles.")
+
+(defun my/status--cancel-scroll-update ()
+  "Cancel a pending scroll refresh."
+  (when (timerp my/status--scroll-timer)
+    (cancel-timer my/status--scroll-timer))
+  (setq my/status--scroll-timer nil))
+
+(defun my/status--after-scroll ()
+  "Refresh the final cursor position once scrolling pauses."
+  (setq my/status--scroll-timer nil)
+  (when my/status-mode (my/status-update)))
+
+(defun my/status--after-command ()
+  "Update immediately for editing, and after a pause for wheel events.
+Composing the bar measures text and changes the echo area's buffer.
+Keeping that out of every touchpad event avoids extra redisplay work
+across the frame, particularly with several Git tool panes visible."
+  (if (memq this-command '(pixel-scroll-precision my/sidebar-scroll mwheel-scroll))
+      (unless my/status--scroll-timer
+        (setq my/status--scroll-timer
+              (run-with-idle-timer 0.08 nil #'my/status--after-scroll)))
+    (my/status--cancel-scroll-update)
+    (my/status-update)))
+
 (define-minor-mode my/status-mode
   "Show one status bar along the bottom of graphical frames."
   :global t
   :group 'mode-line
   (when (timerp my/status--timer) (cancel-timer my/status--timer))
+  (my/status--cancel-scroll-update)
+  ;; Migrate the hook in an existing session when this file is reloaded.
+  (remove-hook 'post-command-hook #'my/status-update)
   (if my/status-mode
       (progn
         (my/status--prepare-echo-area)
@@ -444,7 +473,7 @@ minibuffer closes, so this runs again then."
         (unless (eq command-error-function #'my/status--command-error)
           (setq my/status--command-error command-error-function
                 command-error-function #'my/status--command-error))
-        (add-hook 'post-command-hook #'my/status-update 90)
+        (add-hook 'post-command-hook #'my/status--after-command 90)
         (add-hook 'window-selection-change-functions #'my/status-update)
         (add-hook 'window-buffer-change-functions #'my/status-update)
         (add-hook 'window-size-change-functions #'my/status--resized)
@@ -464,7 +493,7 @@ minibuffer closes, so this runs again then."
                                    command-error-function)
           my/status--message nil
           my/status--last nil)
-    (remove-hook 'post-command-hook #'my/status-update)
+    (remove-hook 'post-command-hook #'my/status--after-command)
     (remove-hook 'window-selection-change-functions #'my/status-update)
     (remove-hook 'window-buffer-change-functions #'my/status-update)
     (remove-hook 'window-size-change-functions #'my/status--resized)

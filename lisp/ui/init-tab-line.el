@@ -70,11 +70,19 @@ Process buffers can be created without running a major-mode hook."
     (let* ((mouse (mouse-pixel-position))
            (frame (car mouse))
            (xy (cdr mouse))
-           (position (when (and (frame-live-p frame)
-                                (integerp (car xy)) (integerp (cdr xy))
-                                (<= 0 (car xy)) (<= 0 (cdr xy))
-                                (< (car xy) (frame-pixel-width frame))
-                                (< (cdr xy) (frame-pixel-height frame)))
+           ;; `posn-at-x-y' can lay out buffer text.  During a touchpad
+           ;; scroll, do that only over the tab strip, never over code or
+           ;; another tool window in the frame.
+           (window (when (and (frame-live-p frame)
+                              (integerp (car xy)) (integerp (cdr xy))
+                              (<= 0 (car xy)) (<= 0 (cdr xy))
+                              (< (car xy) (frame-pixel-width frame))
+                              (< (cdr xy) (frame-pixel-height frame)))
+                     (window-at-x-y (car xy) (cdr xy) frame)))
+           (position (when (and window
+                                (< (cdr xy)
+                                   (+ (nth 1 (window-pixel-edges window))
+                                      (window-tab-line-height window))))
                        (posn-at-x-y (car xy) (cdr xy) frame)))
            (string (and position (posn-string position)))
            (tab (and position (eq (posn-area position) 'tab-line) string

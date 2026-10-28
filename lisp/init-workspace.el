@@ -27,6 +27,12 @@
 (declare-function my/welcome-show "init-welcome")
 (declare-function my/welcome-empty-buffer "init-welcome")
 (declare-function my/frame-title-directory "init-frame-title")
+(declare-function git-islands-log-window "git-islands-log" (&optional frame))
+(declare-function git-islands-log-hide "git-islands-log" (&optional frame))
+(declare-function git-islands-log-show "git-islands-log" (root))
+(declare-function git-islands-commit-window "git-islands-commit-panel" (&optional frame))
+(declare-function git-islands-commit-hide "git-islands-commit-panel" (&optional frame))
+(declare-function git-islands-commit-show "git-islands-commit-panel" (root))
 (defvar my/frame-title-cache)
 
 (defvar my/workspace-directory (my/var-file "workspaces/")
@@ -544,6 +550,11 @@ already shown in the window keep their place."
 (defun my/workspace--reset-frame (frame &optional directory)
   "Leave FRAME with one empty editor window in DIRECTORY, no sidebar or tabs."
   (my/workspace--hide-sidebar frame)
+  ;; Git panes opt out of `delete-other-windows'.  Explicitly release
+  ;; them before rebuilding: otherwise they keep the previous project's
+  ;; buffers, widths and resize work in the new workspace.
+  (when (fboundp 'git-islands-log-hide) (git-islands-log-hide frame))
+  (when (fboundp 'git-islands-commit-hide) (git-islands-commit-hide frame))
   (let ((window (seq-find (lambda (window) (not (window-parameter window 'window-side)))
                           (window-list frame 'no-minibuffer))))
     (delete-other-windows window)
@@ -571,6 +582,10 @@ restores the frame size and position."
          (layout (plist-get state :layout))
          (sidebar (plist-get state :sidebar))
          (my/workspace--missing 0)
+         (git-log (and (fboundp 'git-islands-log-window)
+                       (git-islands-log-window frame)))
+         (git-commit (and (fboundp 'git-islands-commit-window)
+                          (git-islands-commit-window frame)))
          (window (my/workspace--reset-frame frame root))
          selected)
     (set-frame-parameter frame 'my/workspace-root root)
@@ -588,6 +603,14 @@ restores the frame size and position."
     (when (and (fboundp 'my/sidebar-show)
                (or (null state) (plist-get sidebar :visible)))
       (my/sidebar-show root))
+    ;; Preserve which tools were open, but bind them to the destination
+    ;; repository only after its editor/sidebar layout has been installed.
+    ;; A non-Git or remote workspace must not retain an unrelated Git view.
+    (when-let* (((or git-log git-commit))
+                ((not (file-remote-p root)))
+                (git-root (locate-dominating-file root ".git")))
+      (when git-log (git-islands-log-show git-root))
+      (when git-commit (git-islands-commit-show git-root)))
     (when-let* ((project (project-current nil root)))
       (project-remember-project project))
     (my/workspace-meta-update root :name (my/workspace-root-name root)

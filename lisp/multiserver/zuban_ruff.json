@@ -1,0 +1,7 @@
+{
+  "default": "zuban",
+  "diagnostics": ["zuban", "ruff"],
+  "code_action": ["zuban", "ruff"],
+  "execute_command": ["ruff"],
+  "formatting": "ruff"
+}

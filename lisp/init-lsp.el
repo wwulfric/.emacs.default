@@ -54,6 +54,9 @@ and wrapping settings."
 (setq lsp-bridge-user-langserver-dir
       (expand-file-name "langserver" (file-name-directory
                                      (or load-file-name buffer-file-name))))
+(setq lsp-bridge-user-multiserver-dir
+      (expand-file-name "multiserver" (file-name-directory
+                                      (or load-file-name buffer-file-name))))
 
 ;; Cmd-click: jump to the definition, or list usages when clicking the
 ;; definition itself, as in JetBrains IDEs.
@@ -115,11 +118,11 @@ Otherwise call ORIGINAL with FILENAME, FILEHOST and POSITION to jump."
 
 ;; python
 ;; Language selection already follows python-mode/python-ts-mode.  The
-;; basedpyright.json and ruff.json overrides in `lsp-bridge-user-langserver-dir'
+;; zuban.json and ruff.json overrides in `lsp-bridge-user-langserver-dir'
 ;; use tools installed in Emacs's .venv without changing the global PATH.
 ;; This tool environment is separate from the project's Python interpreter.
-(setq lsp-bridge-python-lsp-server "ruff")
-(setq lsp-bridge-python-multi-lsp-server "basedpyright_ruff")
+(setq lsp-bridge-python-lsp-server "zuban")
+(setq lsp-bridge-python-multi-lsp-server "zuban_ruff")
 
 ;; java
 (require 'lsp-bridge-jdtls) ;; 根据项目自动生成自定义配置，添加必要的启动参数
@@ -167,6 +170,24 @@ ALIST is passed to `consult-xref'; PROMPT replaces its default prompt."
 
 (setq xref-show-xrefs-function #'my/xref-at-point
       xref-show-definitions-function #'my/xref-at-point)
+
+(require 'dumb-jump)
+;; Use the same searcher on macOS regardless of git-grep's regex dialect.
+(setq dumb-jump-force-searcher 'rg)
+
+(defun my/lsp-definition-fallback (position)
+  "Search same-name definitions when LSP has no result at POSITION."
+  ;; Ignore a late response after the user has moved to another symbol.
+  (when (equal position (lsp-bridge--position))
+    (my/lsp-click-clear-context)
+    (let ((xref-backend-functions '(dumb-jump-xref-activate))
+          (xref-show-definitions-function
+           (lambda (fetcher alist)
+             (my/xref-at-point fetcher alist "Possible definitions: "))))
+      (when-let* ((identifier (xref-backend-identifier-at-point 'dumb-jump)))
+        (xref-find-definitions identifier)))))
+
+(setq lsp-bridge-find-def-fallback-function #'my/lsp-definition-fallback)
 
 ;; Implementations and references arrive as the text of lsp-bridge's
 ;; reference buffer.  Show them as xrefs at point; C-c C-o opens that buffer,

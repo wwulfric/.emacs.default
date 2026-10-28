@@ -94,3 +94,6 @@
 [submodule "lisp/git-islands"]
 	path = lisp/git-islands
 	url = git@github.com:wwulfric/git-islands.git
+[submodule "lisp/dumb-jump"]
+	path = lisp/dumb-jump
+	url = https://github.com/jacktasia/dumb-jump.git

@@ -1,0 +1,11 @@
+{
+  "name": "zuban",
+  "languageId": "python",
+  "command": ["%USER_EMACS_DIRECTORY%.venv/bin/zuban", "server"],
+  "sendSaveNotification": false,
+  "initializationOptions": {
+    "typeCheckingMode": "auto",
+    "diagnosticMode": "open-files-only"
+  },
+  "settings": {}
+}

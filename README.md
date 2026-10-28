@@ -4,6 +4,27 @@
 minibuffer 面板、Islands 卡片布局，以及来自 [git-islands](https://github.com/wwulfric/git-islands)
 的 Git 工具窗口。
 
+## Python 语言服务
+
+使用 Zuban 提供补全、定义跳转、引用与类型诊断，Ruff 提供 lint、格式化和修复。
+在配置目录安装工具（沿用 lsp-bridge 的 `.venv`）：
+
+```sh
+uv pip install --python .venv/bin/python 'zuban==0.10.1' ruff
+```
+
+自定义配置位于 `lisp/langserver/zuban.json` 和
+`lisp/multiserver/zuban_ruff.json`，无需修改 lsp-bridge 源码。
+Zuban 从项目目录启动并自动发现项目环境；工具的 `.venv` 与业务项目环境分开。
+定义跳转失败时使用 dumb-jump 和 `rg` 搜索同名候选。
+Zuban 0.10.1 会把 lsp-bridge 启动时发送的空
+`workspace/didChangeConfiguration` 通知记录为 `unhandled notification`；
+初始化选项仍正常生效，已验证不影响跳转及诊断。
+
+如需回切，将 `lsp-bridge-python-lsp-server` 设为 `"basedpyright"`，
+`lsp-bridge-python-multi-lsp-server` 设为 `"basedpyright_ruff"`，然后执行
+`M-x lsp-bridge-restart-process`。已有的 basedpyright 配置保留。
+
 ## 找快捷键
 
 - **`s-?`**：打开快捷键参考面板，按区域分组列出本配置新增的所有快捷键；可以按说明、命令名或按键搜索，回车直接执行。

@@ -76,11 +76,23 @@
       git-islands-header-ascent my/ui-header-ascent
       git-islands-line-end-inset #'my/ui-line-end-inset)
 (with-eval-after-load 'git-islands-ui
-  (setq git-islands-source-icons my/sidebar-source-icons)
+  (setq git-islands-source-icons my/sidebar-source-icons
+        git-islands-hl-margin 6
+        git-islands-hl-radius 6)
+  (custom-set-faces
+   '(git-islands-button
+     ((((background dark)) (:background "#393B40" :foreground "#DFE1E5"))
+      (t (:background "#ECEDEF" :foreground "#333333"))))
+   '(git-islands-primary-button
+     ((((background dark)) (:background "#3574F0" :foreground "#FFFFFF" :weight normal))
+      (t (:background "#245FA5" :foreground "#FFFFFF" :weight normal)))))
+  ;; Header titles use typography only; the sidebar title inherits default's
+  ;; background, which would cover the Git header's card color.
+  (face-spec-set 'git-islands-title '((t :inherit my/ui-font :weight medium))
+                 'face-defface-spec)
   (pcase-dolist (`(,face . ,config-face)
                  '((git-islands-ui-font . my/ui-font)
                    (git-islands-file-name . my/sidebar-file-name)
-                   (git-islands-title . my/sidebar-project-title)
                    (git-islands-neutral-icon . my/sidebar-neutral-icon)
                    (git-islands-source-icon . my/sidebar-source-icon)
                    (git-islands-hl-line . my/sidebar-hl-line)
@@ -88,6 +100,11 @@
                    (git-islands-toolbar-hover . my/sidebar-toolbar-hover)))
     ;; In place of the package's own default, whose colors would win.
     (face-spec-set face `((t :inherit ,config-face)) 'face-defface-spec)))
+
+(with-eval-after-load 'git-islands-tree
+  (setq git-islands-button-render-function #'git-islands-button-rounded
+        git-islands-button-radius nil
+        git-islands-button-padding 12))
 
 (defun my/git-status-widget (_window)
   "Return the status bar's branch widget for the current buffer, or nil."

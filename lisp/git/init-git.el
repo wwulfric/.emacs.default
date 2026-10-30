@@ -65,27 +65,23 @@
 (defvar my/sidebar-source-icons)
 (defvar my/ui-header-height)
 (defvar my/ui-header-ascent)
+(declare-function my/ui-header-space "frame-setting" (width))
 (declare-function my/ui-line-end-inset "ui-layout" ())
 (defvar git-islands-row-height)
 (defvar git-islands-header-height)
 (defvar git-islands-header-ascent)
+(defvar git-islands-header-space-function)
 (defvar git-islands-line-end-inset)
 (defvar git-islands-source-icons)
 (setq git-islands-row-height my/sidebar-row-height
       git-islands-header-height my/ui-header-height
       git-islands-header-ascent my/ui-header-ascent
+      git-islands-header-space-function #'my/ui-header-space
       git-islands-line-end-inset #'my/ui-line-end-inset)
 (with-eval-after-load 'git-islands-ui
   (setq git-islands-source-icons my/sidebar-source-icons
         git-islands-hl-margin 6
         git-islands-hl-radius 6)
-  (custom-set-faces
-   '(git-islands-button
-     ((((background dark)) (:background "#393B40" :foreground "#DFE1E5"))
-      (t (:background "#ECEDEF" :foreground "#333333"))))
-   '(git-islands-primary-button
-     ((((background dark)) (:background "#3574F0" :foreground "#FFFFFF" :weight normal))
-      (t (:background "#245FA5" :foreground "#FFFFFF" :weight normal)))))
   ;; Header titles use typography only; the sidebar title inherits default's
   ;; background, which would cover the Git header's card color.
   (face-spec-set 'git-islands-title '((t :inherit my/ui-font :weight medium))

@@ -116,6 +116,11 @@
    `(my/sidebar-neutral-icon ((t (:foreground ,muted))))
    `(my/sidebar-source-icon ((t (:foreground ,accent))))
    ;; Git tool windows (lisp/git): IntelliJ's change colors from this palette.
+   ;; Git headers share the sidebar/tab typography and bottom rule.  Do not
+   ;; inherit tab-line itself: islands may shrink it to a card's gap row.
+   `(git-islands-header ((t (:inherit my/ui-font :height 1.0 :weight normal
+                             :background ,bg :foreground ,fg :box nil :overline nil
+                             :underline (:color ,section-rule :position t)))))
    `(git-islands-modified ((t (:foreground ,accent))))
    `(git-islands-added ((t (:foreground ,green))))
    `(git-islands-deleted ((t (:foreground ,muted))))
@@ -123,7 +128,7 @@
    `(git-islands-conflict ((t (:foreground ,red))))
    `(git-islands-dim ((t (:foreground ,muted))))
    `(git-islands-button ((t (:background ,hover :foreground ,fg))))
-   `(git-islands-primary-button ((t (:background ,accent :foreground ,bg))))
+   `(git-islands-primary-button ((t (:background ,accent :foreground ,bg :weight normal))))
    `(git-islands-ref-head ((t (:foreground ,amber))))
    `(git-islands-ref-local ((t (:foreground ,green))))
    `(git-islands-ref-remote ((t (:foreground ,syntax-purple))))

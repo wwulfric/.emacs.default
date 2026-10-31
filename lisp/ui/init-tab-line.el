@@ -190,7 +190,10 @@ Process buffers can be created without running a major-mode hook."
   ;; The native template prefixes every tab with this separator, including
   ;; the first one.  Our formatter already provides face-matched clickable
   ;; padding, so a plain separator would leave a gap before the highlight.
-  (setq tab-line-separator "")
+  (setq tab-line-separator ""
+        tab-line-new-button-show nil
+        tab-line-left-button nil
+        tab-line-right-button nil)
   (setq tab-line-tab-name-function #'tab-line-tab-name-buffer)
   (setq tab-line-tab-name-format-function #'my/tab-line-format-with-padding)
   ;; Closing a tab closes its file, as in JetBrains.  Burying would only

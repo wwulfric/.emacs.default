@@ -102,11 +102,28 @@
         git-islands-button-radius nil
         git-islands-button-padding 12))
 
+(defun my/git-status-label (status)
+  "Render STATUS with aligned Expui icons in the personal status bar."
+  (if (not (expui-icons-svg-p))
+      (git-islands-widget-label status)
+    (let ((gap (propertize " " 'display '(space :width (4))))
+          (branch (or (git-islands-status-branch status)
+                      (let ((head (or (git-islands-status-head status) "")))
+                        (substring head 0 (min 7 (length head)))))))
+      (concat
+       (expui-icons-icon "general/vcs" :height 16 :ascent 'center) gap branch
+       (when (> (git-islands-status-ahead status) 0)
+         (concat gap (expui-icons-icon "vcs/push" :height 16 :ascent 'center)
+                 gap (number-to-string (git-islands-status-ahead status))))
+       (when (> (git-islands-status-behind status) 0)
+         (concat gap (expui-icons-icon "vcs/update" :height 16 :ascent 'center)
+                 gap (number-to-string (git-islands-status-behind status))))))))
+
 (defun my/git-status-widget (_window)
   "Return the status bar's branch widget for the current buffer, or nil."
   (when-let* ((current (git-islands-widget-current)))
     (let ((root (car current)))
-      (my/status--item (propertize (git-islands-widget-label (cdr current)) 'face 'my/status)
+      (my/status--item (propertize (my/git-status-label (cdr current)) 'face 'my/status)
                        (lambda (_event) (git-islands-branches-popup root))
                        "Git Branches (C-~)"))))
 
@@ -144,21 +161,8 @@
 (require 'git-islands-branches)
 (global-set-key (kbd "C-~") #'git-islands-branches-popup)
 
-(defvar my/frame-title-cache)
-(defun my/git-forget-titles (root)
-  "Make the frame title read ROOT's branch again after its status changed."
-  (when (boundp 'my/frame-title-cache)
-    (let (stale)
-      (maphash (lambda (directory _)
-                 (when (string-prefix-p root (file-name-as-directory
-                                              (expand-file-name directory)))
-                   (push directory stale)))
-               my/frame-title-cache)
-      (when stale
-        (dolist (directory stale) (remhash directory my/frame-title-cache))
-        (when (fboundp 'my/frame-title-schedule-refresh)
-          (my/frame-title-schedule-refresh))))))
-(add-hook 'git-islands-status-functions #'my/git-forget-titles)
+;; Titles only show the project name; Git status no longer invalidates them.
+(remove-hook 'git-islands-status-functions #'my/git-forget-titles)
 
 ;;;; Change markers
 

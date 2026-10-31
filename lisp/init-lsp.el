@@ -5,6 +5,7 @@
 (setq lsp-bridge-python-command (concat (global/load-file-path) "../.venv/bin/python"))
 
 (require 'lsp-bridge)
+(require 'init-acm-icons)
 
 ;; ACM normally regenerates popup colors after load-theme (and daemon frame
 ;; creation).  Let Ink's explicit faces win while it is the active top theme.

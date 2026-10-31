@@ -38,6 +38,13 @@ use it; code, keys and line numbers there stay in the code font."
 
 (require 'init-typography)
 (require 'ui-layout)
+(require 'expui-icons)
+
+(defun my/ui-menu-icon ()
+  "Return the Expui menu icon, with a terminal fallback."
+  (if (expui-icons-svg-p)
+      (expui-icons-icon "general/menu")
+    "☰"))
 
 ;; Restore the native title bar and macOS traffic-light buttons on reload.
 (when (eq system-type 'darwin)
@@ -368,7 +375,7 @@ package-owned local mode lines by changing only the default format."
      ;; Emit the spacer directly: mode-line-front-space can be suppressed
      ;; when its nested :eval is reached through an untrusted variable.
      (my/ui-mode-line-space (if (display-graphic-p) (list my/ui-status-padding) 1))
-     (propertize "☰" 'local-map my/ui-mode-menu-map
+     (propertize (my/ui-menu-icon) 'local-map my/ui-mode-menu-map
                  'mouse-face 'mode-line-highlight
                  'help-echo "Left or right click: mode actions, enabled minor modes and key bindings\nMiddle click: help for all modes")
      " " (string-replace "%" "%%" left)

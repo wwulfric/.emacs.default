@@ -24,6 +24,7 @@
 (require 'ui-layout)
 
 (declare-function my/ui-build-mode-menu "frame-setting" ())
+(declare-function my/ui-menu-icon "frame-setting" ())
 (declare-function my/ui-status-line "frame-setting" ())
 (declare-function project-root "project" (project))
 (declare-function expui-icons-icon "expui-icons" (name &rest props))
@@ -233,7 +234,7 @@ of their own that closing the tab would leave behind."
 (defun my/status--left ()
   "Return the left part of the bar for the current buffer."
   (string-join
-   (delq nil (list (my/status--item (propertize "☰" 'face 'my/status)
+   (delq nil (list (my/status--item (propertize (my/ui-menu-icon) 'face 'my/status)
                                     #'my/status-mode-menu "Modes and their menus")
                    (my/status--path)
                    (my/status--flags)))

@@ -35,7 +35,7 @@
   "Lines between windows stacked within one card." :group 'my/islands)
 
 (defvar my/islands-gap 4 "Pixels between the cards.")
-(defvar my/islands-radius 6 "Radius of the islands' corners, in pixels.")
+(defvar my/islands-radius 8 "Radius of the islands' corners, in pixels.")
 
 (defvar my/islands--saved nil
   "Settings replaced by `my/islands-mode', restored when it is turned off.")

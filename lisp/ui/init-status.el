@@ -283,6 +283,9 @@ when it is read-only."
 
 (defun my/status--fit (text width)
   "Return TEXT cut to WIDTH pixels with an ellipsis."
+  ;; Measuring is slow in a long text, and more characters than pixels
+  ;; cannot fit: a very long message would stall every redraw of the bar.
+  (setq text (substring text 0 (min (length text) (max 0 (1+ (ceiling width))))))
   (if (<= (my/status--width text) width)
       text
     (let ((end (length text)))

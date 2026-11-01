@@ -360,8 +360,13 @@ end of the card."
 ;; A divider is one pixel wide, too narrow to press reliably: the pixels
 ;; beside it drag it as well.
 
-(defconst my/islands-edge-grip 3
-  "Pixels on either side of a vertical divider that also drag it.")
+(defconst my/islands-edge-grip 6
+  "Pixels on either side of a vertical divider that also drag it.
+As wide as the empty margin beside the tool windows' rows.")
+
+(defconst my/islands-edge-grip-fringe 4
+  "Pixels of a left fringe that drag the divider beside it.
+The change markers, which take clicks, start right after them.")
 
 (defun my/islands--edge-window (event)
   "Return the window whose right edge mouse EVENT pressed beside, or nil."
@@ -376,7 +381,10 @@ end of the card."
                (left (nth 0 edges))
                (right (- (nth 2 edges) (window-right-divider-width window))))
           (cond
-           ((and (> left 0) (< (- x left) my/islands-edge-grip))
+           ((and (> left 0)
+                 (< (- x left) (if (> (car (window-fringes window)) 0)
+                                   my/islands-edge-grip-fringe
+                                 my/islands-edge-grip)))
             (window-at-x-y (- left 1) (cddr mouse)))
            ((and (>= x (- right my/islands-edge-grip))
                  (not (window-at-side-p window 'right)))

@@ -14,7 +14,7 @@
 ;; panel too.  Vertico draws the candidates (see init-completion.el); this
 ;; file places and frames them:
 ;;
-;;     Recent                             1 / 22     title and count
+;;     Recent                                         title
 ;;     🔍 init                                        input
 ;;     ──────────────────────────────────────────     divider
 ;;     BUFFER                                         group title
@@ -473,24 +473,13 @@ A panel kept up for the next one stays."
                    (string-trim (minibuffer-prompt) "[ \t]+" "[ \t:：]+"))))
     (unless (string-empty-p title) title)))
 
-(defun my/palette--count ()
-  "Return the position and number of candidates, or nil without any."
-  (when (and (bound-and-true-p vertico--input) (boundp 'vertico--total)
-             (> vertico--total 0))
-    (if (>= vertico--index 0)
-        (format "%d / %d" (1+ vertico--index) vertico--total)
-      (number-to-string vertico--total))))
-
 (defun my/palette--header ()
-  "Return the title line: the title or tabs at the left, the count at the right."
-  (let ((count (my/palette--count)))
-    (concat (my/ui-space-to my/palette-icon-indent)
-            (or my/palette--tabs
-                (and my/palette--title
-                     (propertize (my/palette--literal my/palette--title)
-                                 'face 'my/palette-title)))
-            (when count
-              (my/palette--at-right (propertize count 'face 'shadow))))))
+  "Return the title line with the title or tabs at the left."
+  (concat (my/ui-space-to my/palette-icon-indent)
+          (or my/palette--tabs
+              (and my/palette--title
+                   (propertize (my/palette--literal my/palette--title)
+                               'face 'my/palette-title)))))
 
 (define-fringe-bitmap 'my/palette-edge-left
   (vector (ash 1 (1- my/palette-padding))) 1 my/palette-padding '(top periodic))

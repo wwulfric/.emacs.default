@@ -109,6 +109,7 @@
    `(my/tab-line-source ((t (:foreground ,green :background ,bg))))
    `(my/tab-line-source-current ((t (:foreground ,green :background ,bg
                                       :underline (:color ,green :position t)))))
+   `(my/island-rule ((t (:foreground ,section-rule))))
    `(my/sidebar-file-name ((t (:inherit my/ui-font :height 1.0))))
    `(my/sidebar-hl-line ((t (:inherit nil :background ,selection))))
    `(my/sidebar-hl-line-inactive ((t (:inherit nil :background ,inactive-selection))))

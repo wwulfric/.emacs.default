@@ -31,6 +31,9 @@
 (defface my/island-canvas '((t (:background "#ECEEF1")))
   "Canvas around and between the islands." :group 'my/islands)
 
+(defface my/island-rule '((t (:foreground "#E4E7EB")))
+  "Lines between windows stacked within one card." :group 'my/islands)
+
 (defvar my/islands-gap 4 "Pixels between the cards.")
 (defvar my/islands-radius 6 "Radius of the islands' corners, in pixels.")
 
@@ -222,11 +225,39 @@ corner's width blank, and a mode line nothing."
   (my/islands--wrap format 'header-line))
 
 (defun my/islands--status (format)
-  "Put the window's bottom corners around status line FORMAT."
-  (my/islands--wrap format 'mode-line))
+  "Put the window's bottom corners around status line FORMAT.
+With a window below it in its card, the row draws their rule instead."
+  (my/islands--wrap (if (my/islands--stacked-above-p) (my/islands--rule-edge) format)
+                    'mode-line))
+
+(defun my/islands--stacked-above-p (&optional window)
+  "Return non-nil when another window of WINDOW's card lies below it."
+  (and (display-graphic-p)
+       my/ui-mode-line-pixels
+       (/= (nth 3 (window-pixel-edges window))
+           (nth 3 (my/islands--card-edges window)))))
+
+(defun my/islands--rule-edge ()
+  "Return a mode line drawing the rule to the window below it.
+Windows stack with no divider, whose ends could not stop short of the
+card's edges; this rule stops a corner's width short, as a top row's does."
+  (concat (my/islands--space my/islands-radius my/ui-mode-line-pixels)
+          (propertize " " 'face `(:overline ,(face-foreground 'my/island-rule nil t)
+                                  :underline nil :box nil)
+                      'display `(space :align-to ,(my/ui-line-end)
+                                       :height (,my/ui-mode-line-pixels)
+                                       :ascent 75))))
+
+(defun my/islands--space (width height)
+  "Return a blank WIDTH pixels wide and HEIGHT high, without the row's rules."
+  (propertize " " 'face '(:overline nil :underline nil :box nil)
+              'display `(space :width (,width) :height (,height) :ascent 75)))
 
 (defvar-local my/islands--fringe-cookie nil
   "Face remapping that paints this side window buffer's fringes on the canvas.")
+
+(defvar-local my/islands--rule-cookie nil
+  "Face remapping that lets a stacked side window's rule row be one pixel high.")
 
 (defvar-local my/islands--gap-cookie nil
   "Face remapping that lets a bottom card's gap row be as short as the gap.
@@ -262,8 +293,30 @@ at the frame's edge goes, so the card stays white up to it."
                 (setq my/islands--fringe-cookie
                       (face-remap-add-relative 'fringe :background (my/islands--canvas))))
               (unless (equal (seq-take (window-fringes window) 2) fringes)
-                (set-window-fringes window (car fringes) (cadr fringes)))))
+                (set-window-fringes window (car fringes) (cadr fringes))))
+            ;; Below another window of the card, a rule stands in for the
+            ;; divider; the row above the header draws it, so that the
+            ;; header's images do not break it.
+            (if (/= (nth 1 (window-pixel-edges window))
+                    (nth 1 (my/islands--card-edges window)))
+                (progn
+                  (unless (window-parameter window 'tab-line-format)
+                    (set-window-parameter window 'tab-line-format
+                                          '(:eval (my/islands--rule-row))))
+                  (unless my/islands--rule-cookie
+                    (setq my/islands--rule-cookie
+                          (face-remap-add-relative 'tab-line :height 10 :box nil
+                                                   :underline nil
+                                                   :background (my/islands--card)))))
+              (when (window-parameter window 'tab-line-format)
+                (set-window-parameter window 'tab-line-format nil))
+              (when my/islands--rule-cookie
+                (face-remap-remove-relative my/islands--rule-cookie)
+                (setq my/islands--rule-cookie nil))))
            (t
+            (when my/islands--rule-cookie
+              (face-remap-remove-relative my/islands--rule-cookie)
+              (setq my/islands--rule-cookie nil))
             (when my/islands--fringe-cookie
               (face-remap-remove-relative my/islands--fringe-cookie)
               (setq my/islands--fringe-cookie nil)
@@ -278,11 +331,96 @@ at the frame's edge goes, so the card stays white up to it."
 
 (defun my/islands--gap-row ()
   "Return the canvas strip above a bottom card: its gap to the editor.
-With the one-pixel divider it is as wide as the sidebar's gap."
-  (let ((height (max 1 (1- my/islands-gap))))
-    (propertize " " 'face `(:background ,(my/islands--canvas) :box nil
-                            :overline nil :underline nil :height 1)
-                'display `(space :align-to right :height (,height)))))
+Windows have no divider below them, so it is the whole gap."
+  (propertize " " 'face `(:background ,(my/islands--canvas) :box nil
+                          :overline nil :underline nil :height 1)
+              'display `(space :align-to right :height (,my/islands-gap))))
+
+(defconst my/islands--rule-row-pixels 3
+  "Height of the rule row above a stacked side window.
+It is the shortest row its font allows, which leaves the canvas end full.")
+
+(defun my/islands--rule-row ()
+  "Return the short row above a side window stacked below another.
+Its rule, along the row's top, stops a corner's width short of either
+end of the card."
+  (let* ((end (+ (cdr (my/islands--insets)) my/islands-radius))
+         (height `(:height (,my/islands--rule-row-pixels)))
+         (plain '(:box nil :overline nil :underline nil :height 1)))
+    (concat (propertize " " 'face plain
+                        'display `(space :width (,my/islands-radius) ,@height))
+            (propertize " " 'face `(,@plain :overline ,(face-foreground 'my/island-rule nil t))
+                        'display `(space :align-to (- (+ right right-fringe right-margin) (,end))
+                                         ,@height))
+            (propertize " " 'face plain
+                        'display `(space :width (,my/islands-radius) ,@height))
+            (propertize " " 'face `(:background ,(my/islands--canvas) ,@plain)
+                        'display `(space :align-to (+ right right-fringe right-margin) ,@height)))))
+
+;; A divider is one pixel wide, too narrow to press reliably: the pixels
+;; beside it drag it as well.
+
+(defconst my/islands-edge-grip 3
+  "Pixels on either side of a vertical divider that also drag it.")
+
+(defun my/islands--edge-window (event)
+  "Return the window whose right edge mouse EVENT pressed beside, or nil."
+  (when (eq (car-safe event) 'down-mouse-1)
+    (let ((window (posn-window (event-start event)))
+          (mouse (mouse-pixel-position)))
+      (when (and (windowp window) (not (window-minibuffer-p window))
+                 (eq (car mouse) (window-frame window))
+                 (cadr mouse) (cddr mouse))
+        (let* ((x (cadr mouse))
+               (edges (window-pixel-edges window))
+               (left (nth 0 edges))
+               (right (- (nth 2 edges) (window-right-divider-width window))))
+          (cond
+           ((and (> left 0) (< (- x left) my/islands-edge-grip))
+            (window-at-x-y (- left 1) (cddr mouse)))
+           ((and (>= x (- right my/islands-edge-grip))
+                 (not (window-at-side-p window 'right)))
+            window)))))))
+
+(defun my/islands-drag-edge (event)
+  "Drag the divider beside the press of mouse EVENT, until its release."
+  (interactive "e")
+  (when-let* ((window (my/islands--edge-window event)))
+    (let ((last-x (car (mouse-absolute-pixel-position)))
+          (window-resize-pixelwise t)
+          ;; As `mouse-drag-line' marks its drags.
+          (track-mouse 'dragging)
+          done)
+      (while (not done)
+        (let ((next (read-event)))
+          (cond
+           ((mouse-movement-p next)
+            (let* ((x (car (mouse-absolute-pixel-position)))
+                   (delta (- x last-x)))
+              (unless (zerop delta)
+                (ignore-errors (adjust-window-trailing-edge window delta t t))
+                (setq last-x x)
+                (redisplay t))))
+           ((memq (car-safe next) '(switch-frame select-window)))
+           ((and (mouse-event-p next) (eq (event-basic-type next) 'mouse-1))
+            (setq done t))
+           (t (push next unread-command-events)
+              (setq done t))))))))
+
+(defvar my/islands--edge-map
+  (let ((map (make-sparse-keymap))
+        (item `(menu-item "" my/islands-drag-edge
+                          :filter ,(lambda (command)
+                                     (and (my/islands--edge-window last-input-event)
+                                          command)))))
+    (define-key map [down-mouse-1] item)
+    (define-key map [left-fringe down-mouse-1] item)
+    (define-key map [right-fringe down-mouse-1] item)
+    map)
+  "Keymap claiming presses beside a divider, ahead of the buffers' own.")
+
+(add-to-list 'emulation-mode-map-alists
+             `((my/islands-mode . ,my/islands--edge-map)))
 
 (defun my/islands--apply-frame (frame)
   "Give top-level FRAME the canvas background and title bar, or remove them."
@@ -327,7 +465,9 @@ With the one-pixel divider it is as wide as the sidebar's gap."
         (setq my/ui-line-end-inset #'my/islands--line-end-inset
               window-divider-default-places t
               window-divider-default-right-width 1
-              window-divider-default-bottom-width 1)
+              ;; Stacked windows draw their own rule, which can stop short of
+              ;; a card's edges; gaps below a card are its neighbor's strip.
+              window-divider-default-bottom-width 0)
         (window-divider-mode 1)
         (my/islands--record-card)
         (my/islands--set-faces t)

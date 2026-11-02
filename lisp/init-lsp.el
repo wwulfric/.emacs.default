@@ -423,12 +423,11 @@ bottom line spells out the kind and the full place of the selected one."
                         rows))
          ;; The interface font is proportional: align the places by pixels,
          ;; after the panel's indentation.
-         (column (+ (if (boundp 'palette-islands-indent) palette-islands-indent 0)
+         (column (+ palette-islands-indent
                     (apply #'max 0 (mapcar #'my/lsp-symbol--width names))
                     my/lsp-symbol-column-gap))
          ;; Places keep their end, the file and line, within the panel.
          (place-width (max 12 (- (or (and (buffer-live-p my/lsp-symbol--session)
-                                          (fboundp 'palette-islands-text-width)
                                           (with-current-buffer my/lsp-symbol--session
                                             (palette-islands-text-width)))
                                      100)
@@ -440,8 +439,8 @@ bottom line spells out the kind and the full place of the selected one."
                      (my/ui-space-to column)
                      (propertize (my/ui-fit-left place place-width)
                                  'face 'completions-annotations))))
-        (add-text-properties 0 1 `(my/completion-icon ,icon
-                                   my/completion-detail
+        (add-text-properties 0 1 `(palette-islands-icon ,icon
+                                   palette-islands-detail
                                    ,(if (string-empty-p kind) full
                                       (concat kind " · " full)))
                              candidate)
@@ -532,7 +531,7 @@ bottom line spells out the kind and the full place of the selected one."
     (consult-imenu)))
 
 ;; JetBrains macOS keys.  Cmd-click stays on s-mouse-1.  File structure and
-;; project symbols are kinds of the search window: palette-islands-search.el.
+;; project symbols are kinds of the search window: init-search-config.el.
 (dolist (map (list lsp-bridge-mode-map lsp-bridge-source-mode-map))
   (keymap-set map "s-b" #'lsp-bridge-find-def)          ; Declaration
   (keymap-set map "M-s-b" #'lsp-bridge-find-impl)       ; Implementations

@@ -23,7 +23,7 @@
 (require 'subr-x)
 
 (declare-function my/completion-keys "init-completion" (key))
-(declare-function my/completion--text-end "init-completion" ())
+(declare-function palette-islands-candidates-text-end "palette-islands-candidates" ())
 (declare-function my/ui-at-right "ui-layout" (text &optional edge buffer))
 
 ;;;; Bindings in a keymap
@@ -230,7 +230,7 @@ Global keys come first, by area, then those of each place."
                (descriptions (mapconcat #'key-description keys " ")))
     (concat (propertize (my/keys-describe command)
                         'my/keys-entry entry
-                        'my/completion-detail (format "%s  ·  %s"
+                        'palette-islands-detail (format "%s  ·  %s"
                                                       (my/keys-command-name command)
                                                       descriptions))
             ;; Matched but not shown: the command's name and its keys.
@@ -243,7 +243,7 @@ Global keys come first, by area, then those of each place."
     (my/ui-at-right (mapconcat #'my/completion-keys (nth 2 entry)
                                ;; In pixels, as the alignment measures them.
                                (propertize " " 'display '(space :width (14))))
-                    (my/completion--text-end))))
+                    (palette-islands-candidates-text-end))))
 
 (defun my/keys-reference ()
   "List the configuration's keyboard shortcuts; run the one chosen.

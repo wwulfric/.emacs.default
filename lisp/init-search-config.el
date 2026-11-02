@@ -32,8 +32,7 @@
   (interactive)
   (palette-islands-search-run
    'structure
-   (prog1 palette-islands-search-structure-input
-     (setq palette-islands-search-structure-input nil))
+   (palette-islands-search-take-input 'structure)
    #'consult-imenu))
 (setq lsp-bridge-imenu-function #'my/search-structure-reply)
 

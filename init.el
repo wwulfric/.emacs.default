@@ -57,7 +57,7 @@
 (require 'frame-setting)
 ;; Minibuffer completion, shown in a floating panel.
 (require 'init-completion)
-(require 'init-palette)
+(require 'init-palette-config)
 (require 'init-tab-line)
 (require 'init-sidebar)
 (require 'edit-up)
@@ -76,7 +76,7 @@
 (my/status-mode 1)
 (require 'init-jieba-word)
 (require 'init-lsp)
-(require 'init-search)
+(require 'init-search-config)
 ;; IntelliJ's Git tools on top of Magit: Commit tool window, change markers.
 (require 'init-git)
 (require 'init-navigation)

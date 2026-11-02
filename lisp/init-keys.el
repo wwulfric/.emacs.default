@@ -98,7 +98,7 @@ Only keys that differ from these count as the configuration's.")
 (defvar my/keys-global-groups
   '(("\\`git-islands-\\|\\`magit-\\|\\`diff-hl-" . "Git")
     ("\\`my/sidebar-" . "Sidebar")
-    ("\\`my/search\\|\\`consult-\\|imenu\\|\\`ibuffer\\|\\`project-" . "Search")
+    ("\\`palette-islands-search\\|\\`consult-\\|imenu\\|\\`ibuffer\\|\\`project-" . "Search")
     ("\\`xref-\\|lsp" . "Code")
     ("\\`my/workspace\\|\\`my/welcome-" . "Workspaces")
     ("\\`tab-line-\\|kill-this-buffer" . "Tabs"))
@@ -356,9 +356,9 @@ does there instead of running."
                    :left-fringe my/keys-which-key-padding
                    :right-fringe my/keys-which-key-padding
                    :border-width 1
-                   :border-color (face-background 'my/palette-border nil t)
-                   :background-color (face-background 'my/palette nil t)
-                   :foreground-color (face-foreground 'my/palette nil t)
+                   :border-color (face-background 'palette-islands-border nil t)
+                   :background-color (face-background 'palette-islands nil t)
+                   :foreground-color (face-foreground 'palette-islands nil t)
                    :lines-truncate t)))
 
 (defun my/keys--which-key-hide ()

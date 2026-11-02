@@ -13,15 +13,15 @@
 (setq default-input-method "rime"
      rime-show-candidate 'posframe )
 
-(defvar my/palette-padding)
-(defvar my/palette-line-spacing)
+(defvar my/ui-popup-padding)
+(defvar my/ui-popup-line-spacing)
 
 ;; White with a hairline (the `child-frame-border' face), padded and spaced
-;; like the minibuffer panel (init-palette.el) and the completion menu.
+;; like the minibuffer panel (palette-islands.el) and the completion menu.
 (setq rime-posframe-properties
-      `(:border-width 1 :left-fringe ,my/palette-padding
-        :right-fringe ,my/palette-padding
-        :override-parameters ((line-spacing . ,my/palette-line-spacing))))
+      `(:border-width 1 :left-fringe ,my/ui-popup-padding
+        :right-fringe ,my/ui-popup-padding
+        :override-parameters ((line-spacing . ,my/ui-popup-line-spacing))))
 (setq rime-user-data-dir (concat (global/load-file-path) "../rime" ))
 
 (setq rime-disable-predicates

@@ -20,15 +20,15 @@
 (advice-add 'acm-frame-init-colors :around #'my/acm-init-theme-colors)
 
 ;; Completion menus, their documentation and hover documentation share the
-;; minibuffer panel's padding and row spacing (init-palette.el).
-(defvar my/palette-padding)
-(defvar my/palette-line-spacing)
+;; minibuffer panel's padding and row spacing (palette-islands.el).
+(defvar my/ui-popup-padding)
+(defvar my/ui-popup-line-spacing)
 
 (defun my/acm-frame-style (frame)
   "Pad and space the rows of acm popup FRAME like the minibuffer panel."
-  (modify-frame-parameters frame `((left-fringe . ,my/palette-padding)
-                                   (right-fringe . ,my/palette-padding)
-                                   (line-spacing . ,my/palette-line-spacing)))
+  (modify-frame-parameters frame `((left-fringe . ,my/ui-popup-padding)
+                                   (right-fringe . ,my/ui-popup-padding)
+                                   (line-spacing . ,my/ui-popup-line-spacing)))
   (set-face-background 'fringe (face-background 'acm-frame-default-face nil t) frame)
   frame)
 (advice-add 'acm-frame-make-frame :filter-return #'my/acm-frame-style)
@@ -145,21 +145,21 @@ Otherwise call ORIGINAL with FILENAME, FILEHOST and POSITION to jump."
 (setq markdown-command "pandoc")
 
 ;;;; Pickers
-;; Choices about the symbol at point open beside it (init-palette.el);
+;; Choices about the symbol at point open beside it (palette-islands.el);
 ;; project-wide searches use the palette at the top of the frame.
 
 (require 'xref)
 (require 'ui-layout)
 (require 'consult-xref)
-(defvar my/palette-placement)
-(declare-function my/palette-set-status "init-palette" (status))
-(declare-function my/palette-set-action "init-palette" (key description))
-(declare-function my/palette-text-width "init-palette" ())
+(defvar palette-islands-placement)
+(declare-function palette-islands-set-status "palette-islands" (status))
+(declare-function palette-islands-set-action "palette-islands" (key description))
+(declare-function palette-islands-text-width "palette-islands" ())
 
 (defun my/xref-at-point (fetcher alist &optional prompt)
   "Choose among the xrefs of FETCHER beside the symbol at point.
 ALIST is passed to `consult-xref'; PROMPT replaces its default prompt."
-  (let ((my/palette-placement 'point)
+  (let ((palette-islands-placement 'point)
         (consult--customize-alist
          (if prompt
              (cons (cons #'consult-xref
@@ -322,7 +322,7 @@ ORIGINAL displays CONTENT, COUNTER and POSITION in lsp-bridge's buffer."
                                                           (current-local-map)))
                                    ;; The buffer is the only way to edit
                                    ;; every match, so name its key.
-                                   (my/palette-set-action "C-c C-o" "Edit all")))
+                                   (palette-islands-set-action "C-c C-o" "Edit all")))
                       (my/xref-at-point
                        (lambda () items) nil
                        (format "%s of %s: " my/lsp-locations-kind
@@ -335,7 +335,7 @@ ORIGINAL displays CONTENT, COUNTER and POSITION in lsp-bridge's buffer."
 ;; Rename edits the symbol where it is.
 (defun my/lsp-rename-at-point (original &rest args)
   "Read the new name for ORIGINAL with ARGS beside the symbol."
-  (let ((my/palette-placement 'point))
+  (let ((palette-islands-placement 'point))
     (apply original args)))
 (advice-add 'lsp-bridge-rename :around #'my/lsp-rename-at-point)
 
@@ -381,7 +381,7 @@ ORIGINAL displays CONTENT, COUNTER and POSITION in lsp-bridge's buffer."
 (defconst my/lsp-symbol-column-gap 16
   "Pixels between the name and place columns.")
 
-(defvar my/palette-indent)
+(defvar palette-islands-indent)
 
 (defun my/lsp-symbol--width (name)
   "Return the width of NAME in pixels, in the panel's interface font."
@@ -423,14 +423,14 @@ bottom line spells out the kind and the full place of the selected one."
                         rows))
          ;; The interface font is proportional: align the places by pixels,
          ;; after the panel's indentation.
-         (column (+ (if (boundp 'my/palette-indent) my/palette-indent 0)
+         (column (+ (if (boundp 'palette-islands-indent) palette-islands-indent 0)
                     (apply #'max 0 (mapcar #'my/lsp-symbol--width names))
                     my/lsp-symbol-column-gap))
          ;; Places keep their end, the file and line, within the panel.
          (place-width (max 12 (- (or (and (buffer-live-p my/lsp-symbol--session)
-                                          (fboundp 'my/palette-text-width)
+                                          (fboundp 'palette-islands-text-width)
                                           (with-current-buffer my/lsp-symbol--session
-                                            (my/palette-text-width)))
+                                            (palette-islands-text-width)))
                                      100)
                                  name-width 3)))
          (candidates nil))
@@ -453,8 +453,8 @@ bottom line spells out the kind and the full place of the selected one."
     (when (buffer-live-p my/lsp-symbol--session)
       (with-current-buffer my/lsp-symbol--session
         ;; An empty list says why: nothing typed, or nothing indexed yet.
-        (when (fboundp 'my/palette-set-status)
-          (my/palette-set-status
+        (when (fboundp 'palette-islands-set-status)
+          (palette-islands-set-status
            (cond ((string-empty-p (or my/lsp-symbol--query ""))
                   (propertize "Type to search symbols in the project" 'face 'shadow))
                  ((null candidates)
@@ -469,10 +469,10 @@ bottom line spells out the kind and the full place of the selected one."
   (if (string-empty-p query)
       (my/lsp-symbol--update nil)
     ;; Only while nothing is listed, so typing does not resize the panel.
-    (when (and (fboundp 'my/palette-set-status) (null my/lsp-symbol--candidates)
+    (when (and (fboundp 'palette-islands-set-status) (null my/lsp-symbol--candidates)
                (buffer-live-p my/lsp-symbol--session))
       (with-current-buffer my/lsp-symbol--session
-        (my/palette-set-status (propertize "Searching…" 'face 'shadow))))
+        (palette-islands-set-status (propertize "Searching…" 'face 'shadow))))
     (when (window-live-p my/lsp-symbol--window)
       (with-current-buffer (window-buffer my/lsp-symbol--window)
         (lsp-bridge-call-file-api "workspace_symbol" query)))))
@@ -532,7 +532,7 @@ bottom line spells out the kind and the full place of the selected one."
     (consult-imenu)))
 
 ;; JetBrains macOS keys.  Cmd-click stays on s-mouse-1.  File structure and
-;; project symbols are kinds of the search window: init-search.el.
+;; project symbols are kinds of the search window: palette-islands-search.el.
 (dolist (map (list lsp-bridge-mode-map lsp-bridge-source-mode-map))
   (keymap-set map "s-b" #'lsp-bridge-find-def)          ; Declaration
   (keymap-set map "M-s-b" #'lsp-bridge-find-impl)       ; Implementations

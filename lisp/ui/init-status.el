@@ -11,7 +11,7 @@
 ;; diagnostics, position, line ends, encoding and a lock toggling
 ;; read-only; as in JetBrains, the title bar names the project and branch.
 ;; Like awesome-tray, the bar is the text of the idle echo area, whose
-;; minibuffer opens in a floating panel (init-palette.el); it sits on the
+;; minibuffer opens in a floating panel (palette-islands.el); it sits on the
 ;; canvas below the cards (init-islands.el).  Messages are drawn in the bar
 ;; rather than replacing it; a long one is cut short, and a click shows
 ;; them all.

@@ -158,7 +158,7 @@
    `(my/welcome-hint ((t (:foreground ,muted))))
    `(my/welcome-row ((t (:background ,selection))))
    ;; Completion and Chinese input popups: white with a hairline, like the
-   ;; minibuffer panel (my/palette).
+   ;; minibuffer panel (palette-islands).
    `(acm-frame-default-face ((t (:foreground ,fg :background ,bg))))
    `(acm-frame-border-face ((t (:background ,border))))
    `(acm-frame-select-face ((t (:foreground ,accent :background ,selection))))
@@ -169,13 +169,14 @@
    `(rime-comment-face ((t (:foreground ,comment))))
    `(rime-candidate-num-face ((t (:foreground ,muted))))
    ;; Floating minibuffer: white like the other popups, a hairline and one accent.
-   `(my/palette ((t (:foreground ,fg :background ,bg))))
-   `(my/palette-border ((t (:background ,border))))
-   `(my/palette-title ((t (:foreground ,structure))))
-   `(my/palette-divider ((t (:strike-through ,section-rule :height 0.5))))
-   `(my/palette-footer ((t (:background ,surface))))
-   `(my/palette-tab ((t (:foreground ,muted))))
-   `(my/palette-tab-active ((t (:foreground ,fg :underline (:color ,accent :position t)))))
+   `(palette-islands ((t (:foreground ,fg :background ,bg))))
+   '(palette-islands-font ((t (:inherit my/ui-font))))
+   `(palette-islands-border ((t (:background ,border))))
+   `(palette-islands-title ((t (:foreground ,structure))))
+   `(palette-islands-divider ((t (:strike-through ,section-rule :height 0.5))))
+   `(palette-islands-footer ((t (:background ,surface))))
+   `(palette-islands-tab ((t (:foreground ,muted))))
+   `(palette-islands-tab-active ((t (:foreground ,fg :underline (:color ,accent :position t)))))
    `(minibuffer-nonselected ((t (:foreground ,muted))))
    `(vertico-current ((t (:background ,selection :extend t))))
    `(vertico-group-title ((t (:foreground ,muted :slant normal :height 0.85))))

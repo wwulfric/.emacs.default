@@ -7,9 +7,18 @@
 (defconst my/ui-status-padding my/ui-editor-padding
   "Horizontal padding at both edges of editor status bars, in pixels.")
 
+(defconst my/ui-popup-padding (* 3 my/ui-space-small)
+  "Horizontal padding inside popups, in pixels, as in the minibuffer panel.")
+
+(defvar my/ui-popup-line-spacing
+  (if (< emacs-major-version 31) 0.44 '(0.22 . 0.22))
+  "Extra spacing relative to the line height of each row of popups.
+The input method's candidates and completion menus use it.  Emacs 31
+splits it above and below; older versions put it all below.")
+
 (defface my/ui-font '((t (:family "Helvetica Neue" :weight normal)))
   "Proportional font of interface text, as in an IDE's lists and trees.
-The sidebar (init-sidebar.el) and the minibuffer panel (init-palette.el)
+The sidebar (init-sidebar.el) and the minibuffer panel (palette-islands.el)
 use it; code, keys and line numbers there stay in the code font."
   :group 'faces)
 

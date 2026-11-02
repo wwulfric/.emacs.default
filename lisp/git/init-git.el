@@ -29,8 +29,8 @@
 (declare-function git-islands-widget-label "git-islands-branches" (status))
 (declare-function git-islands-branches-popup "git-islands-branches" (&optional root))
 (defvar my/islands-mode)
-(defvar my/palette-placement)
-(defvar my/palette-anchor)
+(defvar palette-islands-placement)
+(defvar palette-islands-anchor)
 (defvar my/status-right-functions)
 
 (defun my/git-islands-header (format)
@@ -43,8 +43,8 @@
 
 (defun my/git-palette-below (anchor read)
   "Call READ with the minibuffer panel dropped down from ANCHOR."
-  (let ((my/palette-placement 'point)
-        (my/palette-anchor anchor))
+  (let ((palette-islands-placement 'point)
+        (palette-islands-anchor anchor))
     (funcall read)))
 
 (defun my/git-sidebar-directory ()

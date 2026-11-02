@@ -97,3 +97,6 @@
 [submodule "lisp/dumb-jump"]
 	path = lisp/dumb-jump
 	url = https://github.com/jacktasia/dumb-jump.git
+[submodule "lisp/palette-islands"]
+	path = lisp/palette-islands
+	url = git@github.com:wwulfric/palette-islands.git

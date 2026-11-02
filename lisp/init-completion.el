@@ -5,7 +5,7 @@
 ;; order, Marginalia adds quiet annotations and Consult supplies search
 ;; commands with previews.  All of them extend `completing-read', so prompts
 ;; from Emacs, project.el, xref and lsp-bridge share one interface.
-;; init-palette.el decides where that interface appears; init-lsp.el adds the
+;; palette-islands.el decides where that interface appears; init-lsp.el adds the
 ;; language-server pickers.
 
 ;;; Code:
@@ -48,8 +48,8 @@ Mixed lists such as `consult-buffer' tag each candidate with its own."
   (or (get-text-property 0 'multi-category candidate)
       (cons (completion-metadata-get vertico--metadata 'category) candidate)))
 
-(declare-function my/palette-text-width "init-palette" ())
-(declare-function my/palette-text-end "init-palette" ())
+(declare-function palette-islands-text-width "palette-islands" ())
+(declare-function palette-islands-text-end "palette-islands" ())
 
 (defconst my/completion-annotation-height 0.85
   "Height of detailed annotations relative to the candidates.")
@@ -101,16 +101,16 @@ Elsewhere it is abbreviated, and relative directories stay as they are."
 (defun my/completion--text-end ()
   "Return the `:align-to' position where right-aligned candidate text ends.
 Marginalia runs annotators in the original buffer, so ask the minibuffer."
-  (or (when-let* (((fboundp 'my/palette-text-end))
+  (or (when-let* (((fboundp 'palette-islands-text-end))
                   (window (active-minibuffer-window)))
         (with-current-buffer (window-buffer window)
-          (my/palette-text-end)))
+          (palette-islands-text-end)))
       'right))
 
 (defun my/completion--after-name (name directory)
   "Return NAME with DIRECTORY at the right, faded, smaller and shortened from
 the left to fit.  DIRECTORY is shown as `my/completion--short-directory' says."
-  (let* ((room (or (and (fboundp 'my/palette-text-width) (my/palette-text-width))
+  (let* ((room (or (and (fboundp 'palette-islands-text-width) (palette-islands-text-width))
                    80))
          (width (max 12 (- room (string-width name) 6)))
          (directory (copy-sequence
@@ -135,7 +135,7 @@ Names are what one scans for, as in JetBrains' Search Everywhere."
 
 (defun my/completion-icon (candidate)
   "Return the icon of CANDIDATE, a file, buffer or tagged item, or nil.
-The icons are those of the sidebar and the tabs; init-palette.el places
+The icons are those of the sidebar and the tabs; palette-islands.el places
 them below its search icon.  Other pickers name an icon in the
 `my/completion-icon' property of their candidates."
   (when (expui-icons-svg-p)
@@ -168,7 +168,7 @@ them below its search icon.  Other pickers name an icon in the
 (defun my/completion-detail (candidate)
   "Return the full location or description of CANDIDATE.
 Files, buffers, matches and xrefs have a location; commands, functions
-and variables the first line of their documentation.  init-palette.el
+and variables the first line of their documentation.  palette-islands.el
 shows it below the list.  Other pickers put it in the
 `my/completion-detail' property of their candidates."
   (or (get-text-property 0 'my/completion-detail candidate)
@@ -216,7 +216,7 @@ breaks."
   "Call FORMAT with CANDIDATE and ARGS, showing names before directories.
 Buffers of files or directories follow their name with the directory too.
 Matched lines of code stay in the code font where the list uses the
-interface font (init-palette.el)."
+interface font (palette-islands.el)."
   (pcase-let ((`(,category . ,target) (my/completion--category candidate)))
     (pcase category
       ((or 'file 'project-file)
@@ -237,7 +237,7 @@ interface font (init-palette.el)."
 
 ;;;; Matching
 
-;; "ui pal" finds lisp/ui/init-palette.el; word prefixes such as "evp" find
+;; "ui pal" finds lisp/ui/palette-islands.el; word prefixes such as "evp" find
 ;; eval-print-last-sexp, and initials such as "pff" project-find-file.
 ;; File names try partial completion (/u/s/l) first.
 
@@ -358,7 +358,7 @@ Quietly: a message would show inside the floating panel's input."
  :preview-key nil)
 
 ;; JetBrains macOS keys, matching s-1 for the project sidebar.  Searches of
-;; files, text, lines and symbols are kinds of one window: init-search.el.
+;; files, text, lines and symbols are kinds of one window: palette-islands-search.el.
 (keymap-global-set "C-x b" #'consult-buffer)
 (keymap-global-set "s-e" #'consult-buffer)            ; Recent files
 (keymap-global-set "M-g i" #'consult-imenu)

@@ -476,11 +476,11 @@ descriptions line up; columns are as many as fit, at most three."
 ;; centered list of ways to open something, with this config's keys.
 
 (defconst my/welcome-empty-actions
-  '(("Search Everywhere" . my/search)
-    ("Go to File" . my/search-files)
+  '(("Search Everywhere" . palette-islands-search)
+    ("Go to File" . palette-islands-search-files)
     ("Recent Files" . consult-buffer)
-    ("Find in Files" . my/search-text)
-    ("Find Action" . my/search-commands)
+    ("Find in Files" . palette-islands-search-text)
+    ("Find Action" . palette-islands-search-commands)
     ("Project View" . my/sidebar-toggle)
     ("Switch Project" . project-switch-project))
   "Rows of the empty editor as (LABEL . COMMAND); unbound commands are left out.")

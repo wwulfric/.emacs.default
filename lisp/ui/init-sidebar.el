@@ -1478,6 +1478,9 @@ The window stays dedicated, so it never shows an editor buffer."
      buffer `((side . left) (slot . -1) (dedicated . t)
               (window-width . ,(my/sidebar-width))
               (window-parameters (no-other-window . t)
+                                 ;; Commit can hide the mode line on this slot.
+                                 ;; Let the Project buffer draw its bottom edge.
+                                 (mode-line-format . nil)
                                  (no-delete-other-windows . t))))))
 
 (defun my/sidebar-hide (&optional frame)

@@ -77,6 +77,8 @@
 (require 'init-jieba-word)
 (require 'init-lsp)
 (require 'init-search-config)
+;; Submodules' files listed at once, for the search window's Files.
+(require 'init-project-files)
 ;; IntelliJ's Git tools on top of Magit: Commit tool window, change markers.
 (require 'init-git)
 (require 'init-navigation)

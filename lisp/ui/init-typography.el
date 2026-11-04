@@ -16,12 +16,17 @@
   ;; https://emacs-china.org/t/emacs/30399/18 uses 1.2 + 0.2.
   ;; About 40% extra height for ordinary text,
   ;; split above/below.  Emacs still accommodates taller glyphs naturally.
-  ;; Copy the plist so unrelated defaults and other buffers stay intact.
-  (setq-local default-text-properties
-              (let ((properties (copy-sequence default-text-properties)))
-                (setq properties (plist-put properties 'line-height 1.2))
-                (plist-put properties 'line-spacing 0.2)))
-  (setq-local line-spacing 0))
+  ;; Since Emacs 31 `line-spacing' takes space above and below, and spaces
+  ;; every row.  Properties on newlines miss rows that never reach their
+  ;; newline, as truncated lines, which then come out shorter.
+  (if (>= emacs-major-version 31)
+      (setq-local line-spacing '(0.2 . 0.2))
+    ;; Copy the plist so unrelated defaults and other buffers stay intact.
+    (setq-local default-text-properties
+                (let ((properties (copy-sequence default-text-properties)))
+                  (setq properties (plist-put properties 'line-height 1.2))
+                  (plist-put properties 'line-spacing 0.2)))
+    (setq-local line-spacing 0)))
 
 (add-hook 'prog-mode-hook #'my/typography-code-spacing)
 ;; Also apply when this configuration is reloaded with code buffers open.

@@ -338,22 +338,46 @@ ROOM is the width free for it and TOTAL the bar's; nil when it has no room."
               (let ((inhibit-read-only t)
                     (inhibit-modification-hooks t))
                 (erase-buffer)
-                (insert text))
-              (my/status--fit-echo-area))))))))
+                (insert text)))))))))
+
+(defvar my/status--fit-attempt nil
+  "The echo area height last found unreachable: (WINDOW TARGET REACHED).")
+
+(defun my/status--echo-area-height (window)
+  "Return the pixel height the echo area WINDOW should have for the bar.
+The bar is one truncated line, so this is the window's own line height,
+which counts `line-spacing', plus what lies outside its body.  Measuring
+the bar's text instead can come out a pixel taller than the height
+Emacs gives a one-line echo area; each would then undo the other on
+every redisplay, interrupting pixel scrolling in the editor."
+  (+ (window-default-line-height window)
+     (- (window-pixel-height window) (window-body-height window t))))
 
 (defun my/status--fit-echo-area ()
-  "Make the echo area as tall as the bar.
+  "Make the idle echo area as tall as the bar.
 Resizing the frame, as when entering full screen, gives the echo area
-back its height of one line, which cuts off the bar's spacing."
-  (let* ((window (minibuffer-window))
-         (height (cdr (window-text-pixel-size window))))
-    (when (and (> height 0) (/= height (window-pixel-height window)))
-      (window--resize-mini-window window (- height (window-pixel-height window))))))
+back its height of one line, which cuts off the bar's spacing.  This
+changes the layout, so it runs on size changes, never on the bar's
+text changes; once the height is right it does nothing."
+  (let ((window (minibuffer-window)))
+    (when (and (display-graphic-p) (not (active-minibuffer-window))
+               (equal (buffer-name (window-buffer window)) " *Minibuf-0*"))
+      (let ((target (my/status--echo-area-height window))
+            (height (window-pixel-height window)))
+        ;; A height that limits such as `max-mini-window-height' do not
+        ;; allow is tried once, not again on every later size change.
+        (unless (or (= target height)
+                    (equal (list window target height) my/status--fit-attempt))
+          (window--resize-mini-window window (- target height))
+          (let ((reached (window-pixel-height window)))
+            (setq my/status--fit-attempt
+                  (unless (= reached target) (list window target reached)))))))))
 
 (defun my/status--resized (_frame)
-  "Redraw the bar for the frame's new size."
+  "Redraw the bar for the frame's new size, and refit the echo area."
   (setq my/status--last nil)
-  (my/status-update))
+  (my/status-update)
+  (my/status--fit-echo-area))
 
 (defun my/status--after-minibuffer ()
   "Redraw the bar once the minibuffer has closed."
@@ -369,7 +393,8 @@ next input.  Then redraw the bar."
               (text (current-message)))
     (message nil)
     (message "%s" text))
-  (my/status-update))
+  (my/status-update)
+  (my/status--fit-echo-area))
 
 ;;;; Messages
 
@@ -483,7 +508,8 @@ across the frame, particularly with several Git tool panes visible."
         (add-hook 'window-size-change-functions #'my/status--resized)
         (add-hook 'minibuffer-exit-hook #'my/status--after-minibuffer)
         (setq my/status--timer (run-with-timer 1 1 #'my/status-update))
-        (my/status-update))
+        (my/status-update)
+        (my/status--fit-echo-area))
     (setq my/ui-mode-line-pixels nil)
     (my/status--set-mouse nil)
     (advice-remove 'my/ui-status-line #'my/status--mode-line)

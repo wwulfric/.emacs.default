@@ -338,7 +338,11 @@ ROOM is the width free for it and TOTAL the bar's; nil when it has no room."
               (let ((inhibit-read-only t)
                     (inhibit-modification-hooks t))
                 (erase-buffer)
-                (insert text)))))))))
+                (insert text))))
+          ;; Clearing the echo display on input can hide this buffer even
+          ;; when its text is unchanged.  Invalidate its display as well as
+          ;; updating its contents; do not wait for a later message to do it.
+          (force-window-update (minibuffer-window)))))))
 
 (defvar my/status--fit-attempt nil
   "The echo area height last found unreachable: (WINDOW TARGET REACHED).")

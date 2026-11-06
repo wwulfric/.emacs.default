@@ -103,3 +103,6 @@
 [submodule "lisp/tool-islands"]
 	path = lisp/tool-islands
 	url = git@github.com:wwulfric/tool-islands.git
+[submodule "lisp/multiple-cursors"]
+	path = lisp/multiple-cursors
+	url = https://github.com/magnars/multiple-cursors.el.git

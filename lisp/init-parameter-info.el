@@ -1,8 +1,8 @@
 ;;; init-parameter-info.el --- IntelliJ's Parameter Info and inlay hints -*- lexical-binding: t; -*-
 
 ;;; Commentary:
-;; Parameter Info: S-s-SPC (Cmd-Shift-Space, VS Code's key for it, as
-;; Cmd-P is the search here) shows the parameters of the call around the
+;; Parameter Info: s-P (Cmd-Shift-P: IntelliJ's Cmd-P, which is the search
+;; here, with Shift) shows the parameters of the call around the
 ;; caret above it, the one being typed in bold, every overload on a line
 ;; of its own and those that do not match dimmed.  It also opens by itself
 ;; after typing "(" or ",", and stays while the caret is inside the call,
@@ -202,7 +202,7 @@ for, when an argument was just started, or to follow the shown call."
                            (setq my/parameter-info--asked nil)
                            (message "No parameters to show here"))))))
 
-(keymap-global-set "S-s-SPC" #'my/parameter-info)
+(keymap-global-set "s-P" #'my/parameter-info)
 
 ;;;; Inlay hints
 

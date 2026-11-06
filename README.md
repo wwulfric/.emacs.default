@@ -81,7 +81,7 @@ Zuban 0.10.1 会把 lsp-bridge 启动时发送的空
 | `M-<f7>` | List the usages of the symbol at point in the Find tool window |
 | `M-s-<down>` | Go to the next usage the Find tool window lists |
 | `M-s-<up>` | Go to the previous usage the Find tool window lists |
-| `S-s-SPC` | Show the parameters of the call around point, as Cmd-P does in IntelliJ |
+| `s-P` | Show the parameters of the call around point, as Cmd-P does in IntelliJ |
 
 ### Workspaces
 
@@ -111,6 +111,14 @@ Zuban 0.10.1 会把 lsp-bridge 启动时发送的空
 | `C-<return>` | Start a new, indented line above the current one |
 | `M-<down>` | Go back to the selection before the last Extend Selection |
 | `M-<up>` | Select the piece of code around the selection, or around point |
+| `s-d` | Select the word at the caret; again, add its next occurrence with a caret of its own |
+| `s-D` | Drop the occurrence added last |
+| `C-s-g` | Select every occurrence of the selection or of the word at the caret |
+| `M-S-<up>` | Add a caret on the line above |
+| `M-S-<down>` | Add a caret on the line below |
+| `M-G` | Put a caret at the end of each line of the selection |
+| `M-S-<mouse-1>` | Add a caret where clicked, or remove the one there |
+| `M-S-<drag-mouse-1>` | Put a caret and selection on each line of the column dragged over |
 | `S-<return>` | Start a new, indented line below the current one |
 | `S-s-<down>` | Move the current line or selected lines down COUNT lines |
 | `S-s-<up>` | Move the current line or selected lines up COUNT lines |
@@ -307,5 +315,16 @@ Zuban 0.10.1 会把 lsp-bridge 启动时发送的空
 | `SPC` | Show the problem at point in the editor, staying in the Problems window |
 | `a` | Switch between the edited file’s problems and every open file’s |
 | `g` | List the problems again |
+
+### In Several carets
+
+| Key | Action |
+|---|---|
+| `<escape>` | Go back to one caret, dropping the selections too, as Escape in IntelliJ |
+| `C-g` | Drop the selections; again, go back to one caret |
+| `C-'` | Hide the lines without a caret |
+| `C-:` | Repeat the last command at every caret |
+| `C-v` | Scroll to the next caret |
+| `M-v` | Scroll to the previous caret |
 
 <!-- keys:end -->

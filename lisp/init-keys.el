@@ -119,7 +119,8 @@ Keys whose command matches none are under Editing.")
     ("Annotate" git-islands-annotate git-islands-annotate-mode-map)
     ("Changed lines" diff-hl diff-hl-mode-map)
     ("Find tool window" bottom-tools my/find-mode-map)
-    ("Problems tool window" bottom-tools my/problems-mode-map))
+    ("Problems tool window" bottom-tools my/problems-mode-map)
+    ("Several carets" multiple-cursors-core mc/keymap))
   "Keys that apply in one place, as (TITLE FEATURE KEYMAP).
 The keymap's own keys are listed, or only those differing from what
 `my/keys-remember' saw, if it saw the keymap.")

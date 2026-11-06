@@ -16,18 +16,17 @@
 ;; 上方新增一行
 (defun my-open-line-above ()
   "Start a new, indented line above the current one."
-  (interactive)
-  (unless (= (line-number-at-pos) 1)
-    (previous-line))
-  (end-of-line)
-  (newline-and-indent))
+  (interactive "*")
+  (beginning-of-line)
+  (open-line 1)
+  (indent-according-to-mode))
 (global-set-key (kbd "<C-return>") #'my-open-line-above)
 
 (defun my-delete-whole-line ()
   "Delete the current line without copying to kill ring."
-  (interactive)
-  (delete-region (line-beginning-position) 
-                 (1+ (line-end-position))))
+  (interactive "*")
+  (delete-region (line-beginning-position)
+                 (min (point-max) (1+ (line-end-position)))))
 ;; 删除整行
 (global-set-key (kbd "<s-backspace>") #'my-delete-whole-line)
 

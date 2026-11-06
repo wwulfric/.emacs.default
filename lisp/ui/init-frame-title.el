@@ -66,16 +66,6 @@
 (when (timerp my/frame-title-refresh-timer)
   (cancel-timer my/frame-title-refresh-timer))
 (setq my/frame-title-refresh-timer nil)
-;; Cancel work started by the older branch-aware implementation on reload.
-(when (and (boundp 'my/frame-title-retry-timer)
-           (timerp my/frame-title-retry-timer))
-  (cancel-timer my/frame-title-retry-timer))
-(when (boundp 'my/frame-title-processes)
-  (maphash (lambda (_directory process)
-             (set-process-sentinel process #'ignore)
-             (when (process-live-p process) (delete-process process)))
-           my/frame-title-processes)
-  (clrhash my/frame-title-processes))
 (clrhash my/frame-title-cache)
 
 (add-hook 'post-command-hook #'my/frame-title-schedule-refresh)

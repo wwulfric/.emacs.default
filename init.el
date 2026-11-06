@@ -2,8 +2,6 @@
 
 (setq gc-cons-threshold (* 100 1024 1024))
 
-;; (message (file-truename load-file-name)) ;; debug
-
 (defun global/load-file-path ()
   "获取当前 load 的 file 的 path"
   (file-name-directory (file-truename load-file-name)))
@@ -46,7 +44,6 @@
 (require 'global-shortkeys)
 ;; Editing defaults and completion are independent of the visual theme.
 (setq-default indent-tabs-mode nil)
-(setq original-y-or-n-p 'y-or-n-p)
 (fset 'yes-or-no-p 'y-or-n-p)
 
 (require 'auto-save)

@@ -109,9 +109,6 @@
 (require 'git-islands-branches)
 (global-set-key (kbd "C-~") #'git-islands-branches-popup)
 
-;; Titles only show the project name; Git status no longer invalidates them.
-(remove-hook 'git-islands-status-functions #'my/git-forget-titles)
-
 ;;;; Change markers
 
 ;; Changed lines get a thin bar in the fringe, unsaved changes included;

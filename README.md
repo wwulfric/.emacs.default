@@ -38,6 +38,26 @@ Zuban 0.10.1 会把 lsp-bridge 启动时发送的空
 `lsp-bridge-python-multi-lsp-server` 设为 `"basedpyright_ruff"`，然后执行
 `M-x lsp-bridge-restart-process`。已有的 basedpyright 配置保留。
 
+## 维护与测试
+
+个人配置在 `lisp/init-*.el`、`lisp/ui/` 和 `lisp/git/`；独立包通过
+Git submodule 管理，各包的测试保留在包内。
+
+运行配置层的回归测试（需要本机 Emacs 和已检出的子模块）：
+
+```sh
+sh tests/run.sh
+# 也可只运行指定测试：
+sh tests/run.sh tests/editing-tests.el tests/init-frame-title-tests.el
+```
+
+可用 `EMACS=/path/to/emacs` 指定可执行文件。每个测试文件使用独立 Emacs
+进程和临时状态目录，优先加载较新的源码，不读写日常的 `var/`。
+`tests/` 中的回归测试应纳入版本控制。
+
+布局改动还需要在运行中的 GUI Emacs 中执行 `tests/scroll-replay.el`
+文件头说明的滚动回放，确认 `:jumps` 为 0 且 `:writes` 为空；批处理测试不能替代它。
+
 ## 找快捷键
 
 - **`s-?`**：打开快捷键参考面板，按区域分组列出本配置新增的所有快捷键；可以按说明、命令名或按键搜索，回车直接执行。

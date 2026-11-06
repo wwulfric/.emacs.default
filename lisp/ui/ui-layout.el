@@ -131,14 +131,6 @@ STRING is returned unchanged when nothing needs scaling."
             (put-text-property index (1+ index) 'display `(height ,scale) copy))))
       (or copy string))))
 
-(defun my/ui-line-height (face &optional buffer)
-  "Return the pixel height of a header or mode line drawn in FACE.
-FACE may be a face name or attribute list; BUFFER's face remapping
-applies, the current buffer's by default."
-  (my/ui--row-height (propertize " " 'face face)
-                     (buffer-local-value 'face-remapping-alist
-                                         (or buffer (current-buffer)))))
-
 ;;;; Rounded corners
 
 ;; A child frame is an opaque rectangle on macOS: neither the native
@@ -188,19 +180,6 @@ LINE nil draws no outline."
            (propertize " " 'face '(:box nil :overline nil :underline nil)
                        'display (create-image svg 'svg t :ascent (or ascent 'center))))
          my/ui--corner-cache))))
-
-(defun my/ui-rounded-line (text radius height inside outside line top)
-  "Return TEXT between the two corners of a rounded header or mode line.
-TOP chooses the top corners, else the bottom ones.  RADIUS, HEIGHT,
-INSIDE, OUTSIDE and LINE are as in `my/ui-corner'."
-  (concat (my/ui-corner (if top 'top-left 'bottom-left)
-                        radius height inside outside line)
-          text
-          (propertize " " 'display
-                      `(space :align-to (- (+ right right-fringe right-margin)
-                                           (,radius))))
-          (my/ui-corner (if top 'top-right 'bottom-right)
-                        radius height inside outside line)))
 
 ;;;; Pills
 

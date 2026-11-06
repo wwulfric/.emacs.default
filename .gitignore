@@ -35,4 +35,3 @@ tree-sitter/
 librime/
 .venv/
 early-init.el
-/tests/

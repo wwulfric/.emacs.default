@@ -377,11 +377,13 @@ text changes; once the height is right it does nothing."
             (setq my/status--fit-attempt
                   (unless (= reached target) (list window target reached)))))))))
 
-(defun my/status--resized (_frame)
-  "Redraw the bar for the frame's new size, and refit the echo area."
-  (setq my/status--last nil)
-  (my/status-update)
-  (my/status--fit-echo-area))
+(defun my/status--resized (frame)
+  "Redraw the bar for FRAME's new size, and refit the echo area.
+Child frames, as popups and Sticky Lines, have neither."
+  (unless (frame-parent frame)
+    (setq my/status--last nil)
+    (my/status-update)
+    (my/status--fit-echo-area)))
 
 (defun my/status--after-minibuffer ()
   "Redraw the bar once the minibuffer has closed."

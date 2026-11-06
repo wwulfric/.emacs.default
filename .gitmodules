@@ -100,3 +100,6 @@
 [submodule "lisp/palette-islands"]
 	path = lisp/palette-islands
 	url = git@github.com:wwulfric/palette-islands.git
+[submodule "lisp/tool-islands"]
+	path = lisp/tool-islands
+	url = git@github.com:wwulfric/tool-islands.git

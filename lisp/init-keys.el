@@ -99,7 +99,7 @@ Only keys that differ from these count as the configuration's.")
   '(("\\`git-islands-\\|\\`magit-\\|\\`diff-hl-" . "Git")
     ("\\`my/sidebar-" . "Sidebar")
     ("\\`palette-islands-search\\|\\`consult-\\|imenu\\|\\`ibuffer\\|\\`project-" . "Search")
-    ("\\`xref-\\|lsp\\|\\`my/find-\\|\\`my/problems-\\|\\`my/intentions\\|\\`my/recent-locations" . "Code")
+    ("\\`xref-\\|lsp\\|\\`my/find-\\|\\`my/problems-\\|\\`my/intentions\\|\\`my/parameter-info\\|\\`my/inlay-hints\\|\\`my/recent-locations" . "Code")
     ("\\`my/workspace\\|\\`my/welcome-" . "Workspaces")
     ("\\`tab-line-\\|kill-this-buffer" . "Tabs"))
   "Groups of global keys, by a regexp their command's name matches.

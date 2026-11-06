@@ -80,6 +80,7 @@
 (require 'init-lsp)
 ;; Find and Problems tool windows along the frame's bottom.
 (require 'init-find)
+(require 'init-parameter-info)
 (require 'init-search-config)
 ;; Submodules' files listed at once, for the search window's Files.
 (require 'init-project-files)

@@ -81,6 +81,7 @@ Zuban 0.10.1 会把 lsp-bridge 启动时发送的空
 | `M-<f7>` | List the usages of the symbol at point in the Find tool window |
 | `M-s-<down>` | Go to the next usage the Find tool window lists |
 | `M-s-<up>` | Go to the previous usage the Find tool window lists |
+| `S-s-SPC` | Show the parameters of the call around point, as Cmd-P does in IntelliJ |
 
 ### Workspaces
 

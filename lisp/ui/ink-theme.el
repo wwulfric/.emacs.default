@@ -160,6 +160,8 @@
    ;; Completion and Chinese input popups: white with a hairline, like the
    ;; minibuffer panel (palette-islands).
    `(acm-frame-default-face ((t (:foreground ,fg :background ,bg))))
+   ;; IntelliJ's inlay hints: small gray type on a gray patch.
+   `(lsp-bridge-inlay-hint-face ((t (:foreground ,muted :background ,surface :height 0.9))))
    `(acm-frame-border-face ((t (:background ,border))))
    `(acm-frame-select-face ((t (:foreground ,accent :background ,selection))))
    `(rime-default-face ((t (:foreground ,fg :background ,bg))))

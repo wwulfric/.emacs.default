@@ -51,6 +51,14 @@ what Emacs would allow.
    the next event's retry.
 5. Do not hide a stutter with timers, `scroll-conservatively` or by
    restoring the scroll position: find the writer that keeps changing.
+6. The global `window-size-change-functions` and
+   `window-state-change-functions` also run for child frames, the
+   popups and Sticky Lines (`init-sticky-lines.el`), whose size changes
+   as the editor scrolls.  A writer for the frame's own layout skips
+   them: `(frame-parent frame)` is non-nil.
+7. Something drawn over the editor, as Sticky Lines and Parameter Info
+   are, goes in a child frame, which leaves the window's layout alone; an
+   overlay or header line that changes the text's height does not.
 
 After changing any of these writers, or adding one, replay scrolling in
 the running GUI Emacs with `tests/scroll-replay.el` (its commentary shows

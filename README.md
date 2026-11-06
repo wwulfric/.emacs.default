@@ -4,6 +4,19 @@
 minibuffer 面板、Islands 卡片布局，以及来自 [git-islands](https://github.com/wwulfric/git-islands)
 的 Git 工具窗口。
 
+另外搬来了 IntelliJ 的这些编辑功能，快捷键见下方表格：
+
+- **Find 和 Problems 工具窗口**（`s-3`、`s-6`），底部的列表由 [tool-islands](https://github.com/wwulfric/tool-islands) 绘制。
+- **Alt+Enter**（`M-RET`）：在光标旁列出语言服务器的 quick fix 和重构。
+- **Extend Selection**（`M-<up>` / `M-<down>`）和 **Recent Locations**（`S-s-e`）。
+- **Parameter Info**（`s-P`）：在调用上方显示参数，输入 `(` 或 `,` 时自动弹出。
+  **Inlay hints** 默认打开，`M-x my/inlay-hints-toggle` 可以关掉。
+- **多光标**（`s-d` 等），由 multiple-cursors 提供。鼠标操作和 IntelliJ 一样：
+  ⌥⇧ 点击加一个光标或去掉已有的；⌥⇧ 拖动则在拖过的每一行各放一个光标和选区（列选择）。
+  这两种鼠标操作不在下面的表格里。
+- **Sticky Lines**：滚动时，窗口顶部钉住当前所在的 class、函数和代码块的第一行，点击可跳过去。
+  `M-x my/sticky-lines-mode` 可以关掉。
+
 ## Python 语言服务
 
 使用 Zuban 提供补全、定义跳转、引用与类型诊断，Ruff 提供 lint、格式化和修复。
@@ -64,7 +77,7 @@ Zuban 0.10.1 会把 lsp-bridge 启动时发送的空
 | `s-O` | Open the search window on files |
 | `s-e` `C-x b` | Enhanced ‘switch-to-buffer’ command with support for virtual buffers |
 | `s-l` `M-g g` | Open the search window on line |
-| `s-p` | Search files; a first > @ # : or % searches another kind |
+| `s-p` | Search files; a first prefix searches another kind |
 | `C-x C-b` | Begin using Ibuffer to edit a list of buffers |
 | `M-x` | Open the search window on commands |
 | `M-g i` | Select item from flattened ‘imenu’ using ‘completing-read’ with preview |
@@ -76,12 +89,12 @@ Zuban 0.10.1 会把 lsp-bridge 启动时发送的空
 | `s-3` | Focus the Find tool window; hide it when already focused |
 | `s-6` | Focus the Problems tool window; hide it when already focused |
 | `s-E` `S-s-e` | Go to a place visited or changed lately, chosen from a list |
+| `s-P` | Show the parameters of the call around point, as Cmd-P does in IntelliJ |
 | `s-[` `C-c n b` | Go back to the previous position in xref history |
 | `s-]` `C-c n f` | Go to the point where a previous M-, was invoked |
 | `M-<f7>` | List the usages of the symbol at point in the Find tool window |
 | `M-s-<down>` | Go to the next usage the Find tool window lists |
 | `M-s-<up>` | Go to the previous usage the Find tool window lists |
-| `s-P` | Show the parameters of the call around point, as Cmd-P does in IntelliJ |
 
 ### Workspaces
 
@@ -107,21 +120,19 @@ Zuban 0.10.1 会把 lsp-bridge 启动时发送的空
 |---|---|
 | `s-/` | Smart comment/uncomment for line or region |
 | `s-<backspace>` | Delete the current line without copying to kill ring |
-| `s-?` | List the configuration’s keyboard shortcuts; run the one chosen |
+| `s-?` `S-s-/` | List the configuration’s keyboard shortcuts; run the one chosen |
+| `s-D` | Drop the occurrence added last, as Ctrl-Shift-G does in IntelliJ |
+| `s-d` | Select the word at the caret, then add its next occurrence |
 | `C-<return>` | Start a new, indented line above the current one |
+| `C-s-g` | Select every occurrence of the selection or of the word at the caret |
 | `M-<down>` | Go back to the selection before the last Extend Selection |
 | `M-<up>` | Select the piece of code around the selection, or around point |
-| `s-d` | Select the word at the caret; again, add its next occurrence with a caret of its own |
-| `s-D` | Drop the occurrence added last |
-| `C-s-g` | Select every occurrence of the selection or of the word at the caret |
-| `M-S-<up>` | Add a caret on the line above |
 | `M-S-<down>` | Add a caret on the line below |
-| `M-G` | Put a caret at the end of each line of the selection |
-| `M-S-<mouse-1>` | Add a caret where clicked, or remove the one there |
-| `M-S-<drag-mouse-1>` | Put a caret and selection on each line of the column dragged over |
+| `M-S-<up>` | Add a caret on the line above |
 | `S-<return>` | Start a new, indented line below the current one |
 | `S-s-<down>` | Move the current line or selected lines down COUNT lines |
 | `S-s-<up>` | Move the current line or selected lines up COUNT lines |
+| `M-G` | Put a caret at the end of each line of the selection |
 | `M-b` | 智能向后单词移动 |
 | `C-x C-k C-a` | Add the value of numeric prefix arg (prompt if missing) to ‘kmacro-counter’ |
 | `C-x C-k C-c` | Set the value of ‘kmacro-counter’ to ARG, or prompt for value if no argument |
@@ -253,10 +264,12 @@ Zuban 0.10.1 会把 lsp-bridge 启动时发送的空
 |---|---|
 | `<f7>` `C-c C-n` | Move to the next difference |
 | `S-<f7>` `C-c C-p` | Move to the previous difference |
+| `C-c C-b` | Show the diff of the previous file of the list the diff was opened from |
+| `C-c C-f` | Show the diff of the next file of the list the diff was opened from |
 | `C-c C-k` | Close the diff and restore the windows as they were |
-| `C-c C-r` | Replace the right side’s lines of the difference at point with the left’s |
-| `C-c C-s` | Stage the difference at point |
-| `C-c C-u` | Show the same file’s changes in Magit’s unified diff, to stage by line |
+| `C-c C-r` | Replace the right side’s lines of HUNK with the left’s |
+| `C-c C-s` | Stage HUNK, or unstage it when the index already has it |
+| `C-c C-u` | Switch the diff between the side-by-side and the unified viewer |
 
 ### In the Conflicts
 
@@ -316,14 +329,14 @@ Zuban 0.10.1 会把 lsp-bridge 启动时发送的空
 | `a` | Switch between the edited file’s problems and every open file’s |
 | `g` | List the problems again |
 
-### In Several carets
+### In the Multi-caret mode
 
 | Key | Action |
 |---|---|
 | `<escape>` | Go back to one caret, dropping the selections too, as Escape in IntelliJ |
-| `C-g` | Drop the selections; again, go back to one caret |
 | `C-'` | Hide the lines without a caret |
 | `C-:` | Repeat the last command at every caret |
+| `C-g` | Drop the selections; again, go back to one caret |
 | `C-v` | Scroll to the next caret |
 | `M-v` | Scroll to the previous caret |
 

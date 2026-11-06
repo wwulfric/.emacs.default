@@ -120,7 +120,7 @@ Keys whose command matches none are under Editing.")
     ("Changed lines" diff-hl diff-hl-mode-map)
     ("Find tool window" bottom-tools my/find-mode-map)
     ("Problems tool window" bottom-tools my/problems-mode-map)
-    ("Several carets" multiple-cursors-core mc/keymap))
+    ("Multi-caret mode" multiple-cursors-core mc/keymap))
   "Keys that apply in one place, as (TITLE FEATURE KEYMAP).
 The keymap's own keys are listed, or only those differing from what
 `my/keys-remember' saw, if it saw the keymap.")
@@ -210,11 +210,20 @@ Global keys come first, by area, then those of each place."
                                      (my/keys--changed symbol t)))))
              my/keys-local-maps))))
 
+(defvar my/keys-descriptions
+  '((mc/keyboard-quit . "Drop the selections; again, go back to one caret")
+    (mc-hide-unmatched-lines-mode . "Hide the lines without a caret")
+    (mc/repeat-command . "Repeat the last command at every caret")
+    (mc/cycle-forward . "Scroll to the next caret")
+    (mc/cycle-backward . "Scroll to the previous caret"))
+  "What commands of other packages do, where their documentation says it poorly.")
+
 (defun my/keys-describe (command)
   "Return what COMMAND does, from the first line of its documentation."
   ;; Substituted: quotes become curly and \\[command] its key.
   (let ((doc (ignore-errors (documentation command))))
-    (cond ((and doc (not (string-empty-p doc)))
+    (cond ((and (symbolp command) (alist-get command my/keys-descriptions)))
+          ((and doc (not (string-empty-p doc)))
            (string-remove-suffix "." (car (split-string doc "\n"))))
           ((symbolp command)
            (capitalize (replace-regexp-in-string

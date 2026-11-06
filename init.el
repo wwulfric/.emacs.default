@@ -63,6 +63,8 @@
 (require 'edit-up)
 (require 'init-fingertip)
 (require 'init-treesit)
+;; M-<up> and M-<down> grow and shrink the selection by syntax.
+(require 'init-extend-selection)
 (require 'init-writing)
 ;; Rime is disabled by default; load init-emacs-rime manually to opt in.
 ;; Ink owns face styling; component configs own layout and interaction.
@@ -76,12 +78,18 @@
 (my/status-mode 1)
 (require 'init-jieba-word)
 (require 'init-lsp)
+;; Find and Problems tool windows along the frame's bottom.
+(require 'init-find)
 (require 'init-search-config)
 ;; Submodules' files listed at once, for the search window's Files.
 (require 'init-project-files)
+;; Tool window lists, headers and buttons, styled as the sidebar.
+(require 'init-tool-islands)
 ;; IntelliJ's Git tools on top of Magit: Commit tool window, change markers.
 (require 'init-git)
 (require 'init-navigation)
+;; S-s-e lists the places visited and changed lately.
+(require 'init-recent-locations)
 ;; Per-project workspaces and the start page shown without file arguments.
 (require 'init-workspace)
 (require 'init-welcome)

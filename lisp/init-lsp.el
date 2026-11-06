@@ -339,6 +339,77 @@ ORIGINAL displays CONTENT, COUNTER and POSITION in lsp-bridge's buffer."
     (apply original args)))
 (advice-add 'lsp-bridge-rename :around #'my/lsp-rename-at-point)
 
+;;;; Intentions (M-RET)
+;; IntelliJ's Alt+Enter: the language server's code actions at point, in
+;; a list beside the caret.  A quick fix shows the quick-fix bulb, a
+;; refactoring the refactoring bulb, anything else the intention bulb;
+;; the action the server prefers comes first.
+
+(defconst my/intention-icons
+  '(("quickfix" . "codeInsight/quickfixBulb")
+    ("refactor" . "actions/refactoringBulb"))
+  "Icons of code action kinds, by the kind's first part.")
+
+(defun my/intention-icon (action)
+  "Return the icon of code ACTION, by its kind."
+  (let ((kind (car (split-string (or (plist-get action :kind) "") "\\."))))
+    (or (cdr (assoc kind my/intention-icons)) "codeInsight/intentionBulb")))
+
+(defun my/intention-candidates (actions)
+  "Return ACTIONS as (CANDIDATE . ACTION), the preferred one first."
+  (let ((seen (make-hash-table :test #'equal))
+        candidates)
+    (dolist (action (seq-sort-by (lambda (action) (if (plist-get action :isPreferred) 0 1))
+                                 #'< actions))
+      (let ((title (or (plist-get action :title) "Untitled action")))
+        ;; Two servers may offer the same action: tell them apart.
+        (when (gethash title seen)
+          (setq title (format "%s (%s)" title (or (plist-get action :server-name) "another server"))))
+        (puthash title t seen)
+        (push (cons (propertize title
+                                'palette-islands-icon (my/intention-icon action)
+                                'palette-islands-detail
+                                (string-join (delq nil (list (plist-get action :kind)
+                                                             (plist-get action :server-name)))
+                                             " · "))
+                    action)
+              candidates)))
+    (nreverse candidates)))
+
+(defun my/intention-choose (original actions action-kind)
+  "Choose among the code ACTIONS beside the caret, then apply the choice.
+ORIGINAL, lsp-bridge's own menu, runs when ACTION-KIND asks for one kind:
+it applies a single match without asking."
+  (if (or action-kind (not (display-graphic-p)))
+      (funcall original actions action-kind)
+    (let ((candidates (my/intention-candidates actions)))
+      (if (null candidates)
+          (message "No intentions here")
+        (let* ((palette-islands-placement 'point)
+               (table (lambda (string predicate action)
+                        (if (eq action 'metadata)
+                            '(metadata (category . intention)
+                                       (display-sort-function . identity)
+                                       (cycle-sort-function . identity))
+                          (complete-with-action action candidates string predicate))))
+               (choice (completing-read "Intentions: " table nil t)))
+          (when-let* ((action (cdr (assoc choice candidates))))
+            (lsp-bridge-code-action--fix-do action)))))))
+
+(advice-add 'lsp-bridge-code-action--fix :around #'my/intention-choose)
+
+(defun my/intentions ()
+  "Show the intentions and quick fixes at point, as Alt+Enter does.
+Without a language server, run what the key does in the major mode."
+  (interactive)
+  (if (and (bound-and-true-p lsp-bridge-mode) (lsp-bridge-has-lsp-server-p))
+      (lsp-bridge-code-action)
+    (let ((command (let ((lsp-bridge-mode nil))
+                     (key-binding (this-command-keys-vector)))))
+      (if (and command (not (eq command #'my/intentions)))
+          (call-interactively command)
+        (message "No intentions here")))))
+
 ;; Workspace symbols: the language server matches while you type.
 (defconst my/lsp-symbol-kinds
   ["" "file" "module" "namespace" "package" "class" "method" "property"
@@ -535,8 +606,11 @@ bottom line spells out the kind and the full place of the selected one."
 (dolist (map (list lsp-bridge-mode-map lsp-bridge-source-mode-map))
   (keymap-set map "s-b" #'lsp-bridge-find-def)          ; Declaration
   (keymap-set map "M-s-b" #'lsp-bridge-find-impl)       ; Implementations
-  (keymap-set map "M-<f7>" #'lsp-bridge-find-references) ; Usages
-  (keymap-set map "S-<f6>" #'lsp-bridge-rename))         ; Rename
+  (keymap-set map "M-<f7>" #'my/find-usages)           ; Find Usages, init-find.el
+  (keymap-set map "M-s-<f7>" #'lsp-bridge-find-references) ; Show Usages
+  (keymap-set map "S-<f6>" #'lsp-bridge-rename)          ; Rename
+  (keymap-set map "M-RET" #'my/intentions)               ; Show Context Actions
+  (keymap-set map "M-<return>" #'my/intentions))
 
 
 (provide 'init-lsp)

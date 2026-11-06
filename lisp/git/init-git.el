@@ -22,24 +22,13 @@
 (declare-function my/keys-remember "init-keys" (symbol))
 (declare-function my/sidebar-width "init-sidebar" ())
 (declare-function my/sidebar-hide "init-sidebar" (&optional frame))
-(declare-function my/islands--header "init-islands" (format))
-(declare-function my/islands--card "init-islands" ())
 (declare-function my/status--item "init-status" (text &optional action help))
 (declare-function git-islands-widget-current "git-islands-branches" ())
 (declare-function git-islands-widget-label "git-islands-branches" (status))
 (declare-function git-islands-branches-popup "git-islands-branches" (&optional root))
-(defvar my/islands-mode)
 (defvar palette-islands-placement)
 (defvar palette-islands-anchor)
 (defvar my/status-right-functions)
-
-(defun my/git-islands-header (format)
-  "Return header FORMAT inside the islands' corners when they are on."
-  (if (bound-and-true-p my/islands-mode) (my/islands--header format) format))
-
-(defun my/git-islands-background ()
-  "Return the islands' card color when they are on, else nil."
-  (and (bound-and-true-p my/islands-mode) (my/islands--card)))
 
 (defun my/git-palette-below (anchor read)
   "Call READ with the minibuffer panel dropped down from ANCHOR."
@@ -52,55 +41,14 @@
   (frame-parameter nil 'my/sidebar-directory))
 
 (setq git-islands-mode-line-format '(:eval (my/sidebar-status-line))
-      git-islands-header-function #'my/git-islands-header
-      git-islands-background-function #'my/git-islands-background
       git-islands-with-anchor-function #'my/git-palette-below
       git-islands-fallback-directory-function #'my/git-sidebar-directory
       git-islands-side-window-width #'my/sidebar-width)
 ;; The Commit tool window takes the project sidebar's place.
 (add-hook 'git-islands-side-window-hook #'my/sidebar-hide)
 
-;; Rows, pills and headers as the sidebar and the editor's tabs draw them.
-(defvar my/sidebar-row-height)
-(defvar my/sidebar-source-icons)
-(defvar my/ui-header-height)
-(defvar my/ui-header-ascent)
-(declare-function my/ui-header-space "frame-setting" (width))
-(declare-function my/ui-line-end-inset "ui-layout" ())
-(defvar git-islands-row-height)
-(defvar git-islands-header-height)
-(defvar git-islands-header-ascent)
-(defvar git-islands-header-space-function)
-(defvar git-islands-line-end-inset)
-(defvar git-islands-source-icons)
-(setq git-islands-row-height my/sidebar-row-height
-      git-islands-header-height my/ui-header-height
-      git-islands-header-ascent my/ui-header-ascent
-      git-islands-header-space-function #'my/ui-header-space
-      git-islands-line-end-inset #'my/ui-line-end-inset)
-(with-eval-after-load 'git-islands-ui
-  (setq git-islands-source-icons my/sidebar-source-icons
-        git-islands-hl-margin 6
-        git-islands-hl-radius 6)
-  ;; Header titles use typography only; the sidebar title inherits default's
-  ;; background, which would cover the Git header's card color.
-  (face-spec-set 'git-islands-title '((t :inherit my/ui-font :weight medium))
-                 'face-defface-spec)
-  (pcase-dolist (`(,face . ,config-face)
-                 '((git-islands-ui-font . my/ui-font)
-                   (git-islands-file-name . my/sidebar-file-name)
-                   (git-islands-neutral-icon . my/sidebar-neutral-icon)
-                   (git-islands-source-icon . my/sidebar-source-icon)
-                   (git-islands-hl-line . my/sidebar-hl-line)
-                   (git-islands-hl-line-inactive . my/sidebar-hl-line-inactive)
-                   (git-islands-toolbar-hover . my/sidebar-toolbar-hover)))
-    ;; In place of the package's own default, whose colors would win.
-    (face-spec-set face `((t :inherit ,config-face)) 'face-defface-spec)))
-
-(with-eval-after-load 'git-islands-tree
-  (setq git-islands-button-render-function #'git-islands-button-rounded
-        git-islands-button-radius nil
-        git-islands-button-padding 12))
+;; Rows, pills, headers and buttons come from tool-islands, styled for
+;; every tool window in init-tool-islands.el.
 
 (defun my/git-status-label (status)
   "Render STATUS with aligned Expui icons in the personal status bar."

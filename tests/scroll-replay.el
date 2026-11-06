@@ -28,7 +28,7 @@
 (defconst scroll-replay-writers
   '(window--resize-mini-window window-resize adjust-window-trailing-edge
     set-window-fringes set-window-margins set-window-scroll-bars
-    git-islands-pane-fit my/status--fit-echo-area)
+    tool-islands-pane-fit my/status--fit-echo-area)
   "Functions that change, or try to change, the layout.")
 
 (defvar scroll-replay--state nil

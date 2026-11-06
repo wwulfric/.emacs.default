@@ -73,8 +73,14 @@ Zuban 0.10.1 会把 lsp-bridge 启动时发送的空
 
 | Key | Action |
 |---|---|
+| `s-3` | Focus the Find tool window; hide it when already focused |
+| `s-6` | Focus the Problems tool window; hide it when already focused |
+| `s-E` `S-s-e` | Go to a place visited or changed lately, chosen from a list |
 | `s-[` `C-c n b` | Go back to the previous position in xref history |
 | `s-]` `C-c n f` | Go to the point where a previous M-, was invoked |
+| `M-<f7>` | List the usages of the symbol at point in the Find tool window |
+| `M-s-<down>` | Go to the next usage the Find tool window lists |
+| `M-s-<up>` | Go to the previous usage the Find tool window lists |
 
 ### Workspaces
 
@@ -102,6 +108,8 @@ Zuban 0.10.1 会把 lsp-bridge 启动时发送的空
 | `s-<backspace>` | Delete the current line without copying to kill ring |
 | `s-?` | List the configuration’s keyboard shortcuts; run the one chosen |
 | `C-<return>` | Start a new, indented line above the current one |
+| `M-<down>` | Go back to the selection before the last Extend Selection |
+| `M-<up>` | Select the piece of code around the selection, or around point |
 | `S-<return>` | Start a new, indented line below the current one |
 | `S-s-<down>` | Move the current line or selected lines down COUNT lines |
 | `S-s-<up>` | Move the current line or selected lines up COUNT lines |
@@ -213,7 +221,7 @@ Zuban 0.10.1 会把 lsp-bridge 启动时发送的空
 | Key | Action |
 |---|---|
 | `RET` | Show the file at point side by side, before and after the commit |
-| `TAB` | Fold or unfold the folder at point |
+| `TAB` | Fold or unfold the group or folder at point |
 | `n` | Move cursor vertically down ARG lines |
 | `o` | Open the file at point as it is now |
 | `p` | Move cursor vertically up ARG lines |
@@ -224,7 +232,7 @@ Zuban 0.10.1 会把 lsp-bridge 启动时发送的空
 | Key | Action |
 |---|---|
 | `RET` | Filter the log to the branch at point |
-| `TAB` | Fold or unfold the folder at point |
+| `TAB` | Fold or unfold the group or folder at point |
 | `g` | List the repository’s branches |
 | `n` | Move cursor vertically down ARG lines |
 | `p` | Move cursor vertically up ARG lines |
@@ -280,5 +288,23 @@ Zuban 0.10.1 会把 lsp-bridge 启动时发送的空
 | `C-M-s-<down>` | Go to the beginning of the next hunk in the current buffer |
 | `C-M-s-<up>` | Go to the beginning of the previous hunk in the current buffer |
 | `M-s-z` | Revert the diff hunk with changes at or above the point |
+
+### In the Find tool window
+
+| Key | Action |
+|---|---|
+| `<f4>` `RET` | Go to the usage at point, or fold or unfold the file or folder there |
+| `M-s-<down>` | Go to the next usage the Find tool window lists |
+| `M-s-<up>` | Go to the previous usage the Find tool window lists |
+| `SPC` | Show the usage at point in the editor, staying in the Find window |
+
+### In the Problems tool window
+
+| Key | Action |
+|---|---|
+| `<f4>` `RET` | Go to the problem at point, or fold or unfold the file there |
+| `SPC` | Show the problem at point in the editor, staying in the Problems window |
+| `a` | Switch between the edited file’s problems and every open file’s |
+| `g` | List the problems again |
 
 <!-- keys:end -->

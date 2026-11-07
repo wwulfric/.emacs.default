@@ -50,3 +50,20 @@ cppjieba 的 C++ 弃用警告，本轮没有改动该第三方库。
   对象，使纯逻辑测试不需要整套词库；本轮通过 RIME_DIR 先消除固定个人目录依赖。
 
 tool-islands 的运行时代码变更在本轮开始时已存在，本轮没有将其作为新实现覆盖。
+
+## 依赖关系优化与验证
+
+- lsp-bridge 提供 `lsp-bridge-server-config-features` 能力声明；IntelliJ
+  适配器在注册前检查所需能力及内部入口的参数数量，不兼容时给出更新提示，
+  不留下部分安装的 advice 或模式注册。仍需使用同一 checkout 的 Lisp 与 Python。
+- Python 支持范围统一为 3.12–3.13；锁文件补齐 3.12 所需产物，依赖版本未变。
+  两个 CI 工作流均覆盖两个版本并使用锁文件，启动脚本使用 `--frozen` 避免改写锁文件。
+- Git Islands 的 tree、merge3 直接依赖 tool-islands，启动不再加载旧 UI 别名层；
+  兼容层保留供旧配置显式加载，README 补迁移说明。
+
+本地验证：Git Islands 严格字节编译及 52 个 ERT 通过；IntelliJ 核心 14 个、
+适配器 5 个 ERT 通过。lsp-bridge 在独立 Python 3.12.11 和 3.13.5 环境中，
+各通过 31 个离线 Python 测试及完整集成入口的 36 个 Python、9 个 ERT；
+另有离线 ERT 25 个通过。两套环境均验证启动脚本，锁文件一致性检查通过。
+主配置 48 个回归测试通过，工作流 YAML 解析通过；未将本地验证视为远端 CI 结果。
+本次没有改动布局写入逻辑。

@@ -4,6 +4,8 @@
 minibuffer 面板、Islands 卡片布局，以及来自 [git-islands](https://github.com/wwulfric/git-islands)
 的 Git 工具窗口。
 
+主配置使用 Emacs 31 的显示接口，只维护当前配置，不保留旧状态路径迁移和旧版本显示分支。
+
 另外搬来了 IntelliJ 的这些编辑功能，快捷键见下方表格：
 
 - **Find 和 Problems 工具窗口**（`s-3`、`s-6`），底部的列表由 [tool-islands](https://github.com/wwulfric/tool-islands) 绘制。

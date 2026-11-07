@@ -74,3 +74,23 @@ tool-islands 的运行时代码变更在本轮开始时已存在，本轮没有�
 删除前检索当前配置与子模块 Lisp 源码，未发现旧别名调用。
 清理旧 `.elc` 后，Git Islands 严格字节编译及剩余 51 个 ERT、主配置 48 个
 回归测试全部通过。共享 UI 的函数、变量和 face 统一使用 `tool-islands` 名称。
+
+## 主配置与其余自有库的历史兼容清理
+
+检查主配置及 tool-islands、palette-islands、expui-icons、intellij-server、
+lsp-bridge、emacs-chinese-word-segmentation、rime 的自有源码和测试：
+
+- 主配置：移除根目录 projects/recentf 向 var/ 的启动迁移，现有状态已在 var/；
+  移除 Emacs 31 以前的行间距与侧栏宽度计算分支，README 明确使用 Emacs 31。
+- lsp-bridge：删除 3 个无调用的旧命令/变量别名、Yasnippet 的旧 t 值转换、
+  Python 3.7 以前的 subprocess 分支、Emacs 27 以前的弹窗坐标分支；
+  删除 prefixCaseSensitive 合并选项，大小写统一由 case-mode 设置。
+- 其余 6 个自有库未发现同类需要删除的代码或专门测试，未产生空提交。
+  图标/终端回退、可选后端检测、IntelliJ 能力检查属于当前运行行为，保留。
+  vendored cppjieba/gtest 不作为自有兼容代码改写。没有发现仅覆盖上述已删分支的测试。
+
+验证：主配置 48 个 ERT、独立状态路径启动检查通过；lsp-bridge 离线 Python 31 个、
+ERT 25 个通过，Python 3.12/3.13 完整集成各 36 个 Python、9 个 ERT 通过；
+另验证当前匹配模式、命令成功/失败返回及 Yasnippet nil/默认/自定义格式。
+IntelliJ 核心 14 个、适配器 5 个 ERT 通过。GUI 加载修改后的显示源码后回放
+45 次真实滚轮事件：`(:events 45 :jumps 0 :writes nil :first-jumps nil)`，随后恢复窗口。

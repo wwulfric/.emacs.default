@@ -16,18 +16,11 @@
     (make-directory (if (directory-name-p file) file (file-name-directory file)) t)
     file))
 
-(defun my/var-migrate (old new)
-  "Move the legacy state file OLD to NEW unless NEW already exists."
-  (let ((old (expand-file-name old user-emacs-directory)))
-    (when (and (file-exists-p old) (not (file-exists-p new)))
-      (rename-file old new))
-    new))
-
 ;; Must be set before project.el first reads its file.
-(setq project-list-file (my/var-migrate "projects" (my/var-file "projects")))
+(setq project-list-file (my/var-file "projects"))
 
 ;; Recent files feed the start page.  Never probe remote files at startup.
-(setq recentf-save-file (my/var-migrate "recentf" (my/var-file "recentf"))
+(setq recentf-save-file (my/var-file "recentf")
       recentf-max-saved-items 200
       recentf-auto-cleanup 'never
       recentf-exclude (list (concat "\\`" (regexp-quote my/var-directory))

@@ -734,9 +734,7 @@ Each file is read once until it changes."
 
 (defun my/sidebar-pixel-width (string)
   "Return the width of STRING in pixels, in the sidebar's font."
-  (if (>= emacs-major-version 30)
-      (string-pixel-width string (current-buffer))
-    (string-pixel-width string)))
+  (string-pixel-width string (current-buffer)))
 
 (defun my/sidebar-name-width (name)
   "Return the width of NAME in pixels, measured once per font."

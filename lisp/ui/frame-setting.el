@@ -11,10 +11,9 @@
   "Horizontal padding inside popups, in pixels, as in the minibuffer panel.")
 
 (defvar my/ui-popup-line-spacing
-  (if (< emacs-major-version 31) 0.44 '(0.22 . 0.22))
+  '(0.22 . 0.22)
   "Extra spacing relative to the line height of each row of popups.
-The input method's candidates and completion menus use it.  Emacs 31
-splits it above and below; older versions put it all below.")
+The input method's candidates and completion menus use it, split above and below.")
 
 (defface my/ui-font '((t (:family "Helvetica Neue" :weight normal)))
   "Proportional font of interface text, as in an IDE's lists and trees.

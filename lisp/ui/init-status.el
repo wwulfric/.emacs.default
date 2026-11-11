@@ -353,8 +353,12 @@ which counts `line-spacing', plus what lies outside its body.  Measuring
 the bar's text instead can come out a pixel taller than the height
 Emacs gives a one-line echo area; each would then undo the other on
 every redisplay, interrupting pixel scrolling in the editor."
-  (+ (window-default-line-height window)
-     (- (window-pixel-height window) (window-body-height window t))))
+  ;; `window-default-font-height' uses `face-font', whose face remapping
+  ;; comes from the current buffer, even when WINDOW is given.  A prose
+  ;; buffer's variable-pitch font must not become the echo area's target.
+  (with-current-buffer (window-buffer window)
+    (+ (window-default-line-height window)
+       (- (window-pixel-height window) (window-body-height window t)))))
 
 (defun my/status--fit-echo-area ()
   "Make the idle echo area as tall as the bar.
@@ -371,7 +375,9 @@ text changes; once the height is right it does nothing."
         ;; allow is tried once, not again on every later size change.
         (unless (or (= target height)
                     (equal (list window target height) my/status--fit-attempt))
-          (window--resize-mini-window window (- target height))
+          ;; Its minimum-height calculation uses the same font helper.
+          (with-current-buffer (window-buffer window)
+            (window--resize-mini-window window (- target height)))
           (let ((reached (window-pixel-height window)))
             (setq my/status--fit-attempt
                   (unless (= reached target) (list window target reached)))))))))
@@ -403,6 +409,23 @@ next input.  Then redraw the bar."
 
 ;;;; Messages
 
+(defun my/status--wheel-message (original format-string &rest args)
+  "Keep wheel limit notices out of ORIGINAL's echo display machinery.
+The native `message' clears and redisplays the echo area even when a
+`set-message-functions' handler consumes its text.  Filter these notices
+before entering it, rather than repairing the bar on a later timer."
+  (let ((text (and my/status-mode
+                   (memq this-command
+                         '(pixel-scroll-precision my/sidebar-scroll mwheel-scroll))
+                   (display-graphic-p) (not (active-minibuffer-window))
+                   (stringp format-string)
+                   (apply #'format-message format-string args))))
+    (if (and text
+             (member text (list (error-message-string '(beginning-of-buffer))
+                                (error-message-string '(end-of-buffer)))))
+        text
+      (apply original format-string args))))
+
 (defun my/status--set-message (message)
   "Show MESSAGE in the middle of the bar instead of the echo area.
 Messages while the minibuffer is open, and in terminal frames, go on as
@@ -420,7 +443,16 @@ must still find it under the mouse."
   (when my/status--message
     (setq my/status--message nil)
     (run-at-time 0 nil #'my/status-update))
-  (clear-minibuffer-message))
+  (let ((result (clear-minibuffer-message)))
+    ;; The bar owns the idle minibuffer, not a native echo message.
+    ;; Returning nil lets the command loop blank this display on every
+    ;; wheel event, before the deferred status refresh can redraw it.
+    (if (and (display-graphic-p) (not (active-minibuffer-window))
+             (not (current-message))
+             (equal (buffer-name (window-buffer (minibuffer-window)))
+                    " *Minibuf-0*"))
+        'dont-clear-message
+      result)))
 
 (defvar my/status--command-error nil
   "The `command-error-function' the bar's replaced, called outside of it.")
@@ -488,6 +520,7 @@ across the frame, particularly with several Git tool panes visible."
   (if my/status-mode
       (progn
         (my/status--prepare-echo-area)
+        (advice-add 'message :around #'my/status--wheel-message)
         (add-hook 'minibuffer-inactive-mode-hook #'my/status--prepare-echo-area)
         (my/status--set-mouse t)
         ;; As tall as the cards' corners, or a one-pixel rule without them.
@@ -516,6 +549,7 @@ across the frame, particularly with several Git tool panes visible."
         (my/status-update)
         (my/status--fit-echo-area))
     (setq my/ui-mode-line-pixels nil)
+    (advice-remove 'message #'my/status--wheel-message)
     (my/status--set-mouse nil)
     (advice-remove 'my/ui-status-line #'my/status--mode-line)
     (advice-remove 'my/sidebar-status-line #'my/status--mode-line)

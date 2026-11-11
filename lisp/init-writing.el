@@ -508,8 +508,10 @@ syntax properties and structural caches may be refreshed."
 (defcustom my/writing-code-left-padding 12
   "Pixels of display-only space before each code block line."
   :type 'natnum :group 'my-writing-code)
-(defcustom my/writing-code-vertical-padding 4
-  "Pixels of display-only space at the top and bottom of a code block."
+(defcustom my/writing-code-vertical-padding 0
+  "Pixels of display-only space at the top and bottom of a code block.
+Keep this zero for pixel scrolling: the extra overlay display lines can
+make redisplay move the window start back after an upward wheel event."
   :type 'natnum :group 'my-writing-code)
 
 (defvar-local my/writing-code--overlays nil)

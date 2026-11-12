@@ -178,7 +178,11 @@ LINE nil draws no outline."
                              h r r r r r h (my/ui--svg-color inside)
                              h r a a r (my/ui--svg-color line))))
            (propertize " " 'face '(:box nil :overline nil :underline nil)
-                       'display (create-image svg 'svg t :ascent (or ascent 'center))))
+                       ;; HEIGHT is already measured in pixels.  Automatic
+                       ;; image scaling feeds a larger height back into the
+                       ;; next header redisplay, growing the row without end.
+                       'display (create-image svg 'svg t :scale 1
+                                              :ascent (or ascent 'center))))
          my/ui--corner-cache))))
 
 ;;;; Pills

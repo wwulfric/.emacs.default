@@ -58,13 +58,6 @@
   (file-name-as-directory
    (if (file-remote-p root) root (abbreviate-file-name (expand-file-name root)))))
 
-(defun my/workspace-root-of (directory)
-  "Return the project root containing DIRECTORY, or DIRECTORY itself."
-  (my/workspace-normalize-root
-   (if-let* ((project (project-current nil directory)))
-       (project-root project)
-     directory)))
-
 (defun my/workspace-root-name (root)
   "Return a short display name for ROOT."
   (file-name-nondirectory (directory-file-name root)))
@@ -611,7 +604,8 @@ restores the frame size and position."
                 (git-root (locate-dominating-file root ".git")))
       (when git-log (git-islands-log-show git-root))
       (when git-commit (git-islands-commit-show git-root)))
-    (when-let* ((project (project-current nil root)))
+    (when-let* ((project (project-current nil root))
+                ((equal (my/workspace-normalize-root (project-root project)) root)))
       (project-remember-project project))
     (my/workspace-meta-update root :name (my/workspace-root-name root)
                               :opened (float-time))
@@ -738,7 +732,7 @@ frame's saved size and position."
 
 (defun my/workspace-startup ()
   "Open the project of command-line arguments, or show the start page.
-A directory argument restores its project.  A file argument restores the
+A directory argument restores that directory.  A file argument restores the
 file's project and selects the file.  Without arguments the start page
 fills the placeholder buffer init.el shows while loading."
   (let* ((directory (and (fboundp 'my/sidebar-take-startup-directory)
@@ -750,7 +744,7 @@ fills the placeholder buffer init.el shows while loading."
                                          (window-list nil 'no-minibuffer)))))))
     (cond
      (directory
-      (my/workspace-open (my/workspace-root-of directory) nil nil t))
+      (my/workspace-open directory nil nil t))
      (files
       (when-let* ((project (project-current nil (file-name-directory (car files)))))
         (my/workspace-open (project-root project) files nil t)))

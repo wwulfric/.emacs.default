@@ -1598,13 +1598,11 @@ Before the start page loads, use a scratch buffer, preserving its text."
       (setq-local default-directory (file-name-as-directory directory)))
     buffer))
 
-(declare-function my/workspace-root-of "init-workspace" (directory))
-
 (defun my/sidebar-open-directory (directory)
-  "Open DIRECTORY's project, or DIRECTORY itself, as a workspace.
-Like the start page, this remembers the project and gives it its own tabs."
+  "Open the selected DIRECTORY itself as a workspace.
+Like the start page, this remembers the directory and gives it its own tabs."
   (interactive (list (read-directory-name "Open directory: " nil nil t)))
-  (my/workspace-open (my/workspace-root-of directory)))
+  (my/workspace-open directory))
 
 (defun my/sidebar-project-dired ()
   "Show the current project in the sidebar with an empty editor buffer."

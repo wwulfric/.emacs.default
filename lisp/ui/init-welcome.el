@@ -359,9 +359,9 @@ descriptions line up; columns are as many as fit, at most three."
   (when (my/welcome-target) (my/welcome-open)))
 
 (defun my/welcome-open-directory (directory)
-  "Open DIRECTORY's project, or DIRECTORY itself, as a workspace."
+  "Open the selected DIRECTORY itself as a workspace."
   (interactive (list (read-directory-name "Open directory: " "~/" nil t)))
-  (my/workspace-open (my/workspace-root-of directory)))
+  (my/workspace-open directory))
 
 (defun my/welcome-project-at-point ()
   "Return the project root of the current row or signal a user error."

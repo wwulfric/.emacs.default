@@ -127,6 +127,7 @@
         (conf-toml-mode  . toml-ts-mode)
         (css-mode        . css-ts-mode)
         (js-mode         . js-ts-mode)
+        (javascript-mode . js-ts-mode)
         (js-json-mode    . json-ts-mode)
 	(java-mode       . java-ts-mode)
         (markdown-mode   . markdown-ts-mode)
@@ -139,6 +140,8 @@
 
 ;; Use the built-in Go mode for automatic syntax highlighting.
 (add-to-list 'auto-mode-alist '("\\.go\\'" . go-ts-mode))
+(add-to-list 'auto-mode-alist '("\\.ts\\'" . typescript-ts-mode))
+(add-to-list 'auto-mode-alist '("\\.tsx\\'" . tsx-ts-mode))
 
 ;; (add-hook 'markdown-mode-hook #'(lambda () (treesit-parser-create 'markdown)))
 (add-hook 'markdown-ts-mode-hook #'(lambda () (treesit-parser-create 'markdown)))

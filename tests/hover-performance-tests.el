@@ -47,6 +47,7 @@
   (let ((my/sidebar-name-shown nil) (hidden nil))
     (cl-letf (((symbol-function 'window-at-x-y) (lambda (&rest _) (selected-window)))
               ((symbol-function 'frame-parent) (lambda (&rest _) nil))
+              ((symbol-function 'frame-focus-state) (lambda (_) t))
               ((symbol-function 'posn-at-x-y) (lambda (&rest _) (ert-fail "Text hit test")))
               ((symbol-function 'my/sidebar-name-hide) (lambda () (setq hidden t))))
       (with-temp-buffer
@@ -59,6 +60,7 @@
   (let ((my/sidebar-name-shown nil) shown)
     (cl-letf (((symbol-function 'window-at-x-y) (lambda (&rest _) (selected-window)))
               ((symbol-function 'frame-parent) (lambda (&rest _) nil))
+              ((symbol-function 'frame-focus-state) (lambda (_) t))
               ((symbol-function 'posn-at-x-y) (lambda (&rest _) 'position))
               ((symbol-function 'posn-window) (lambda (_) (selected-window)))
               ((symbol-function 'posn-point) (lambda (_) 1))
@@ -70,5 +72,25 @@
         (set-window-buffer (selected-window) (current-buffer))
         (my/sidebar-name-track (cons (selected-frame) '(100 . 200)))
         (should (eq shown 'label))))))
+
+(ert-deftest my-sidebar-background-hover-skips-covered-row ()
+  (let ((my/sidebar-name-shown nil))
+    (dolist (focus '(nil unknown))
+      (cl-letf (((symbol-function 'frame-focus-state) (lambda (_) focus))
+                ((symbol-function 'window-at-x-y)
+                 (lambda (&rest _) (ert-fail "Hit-tested a background frame"))))
+        (my/sidebar-name-track (cons (selected-frame) '(100 . 200)))))))
+
+(ert-deftest my-sidebar-focus-loss-dismisses-full-name ()
+  (let ((my/sidebar-name-shown (list (selected-window) 1 'key))
+        (focused t))
+    (cl-letf (((symbol-function 'frame-focus-state)
+               (lambda (frame) (should (eq frame (selected-frame))) focused))
+              ((symbol-function 'posframe-hide) #'ignore))
+      (my/sidebar-name-hide-on-blur)
+      (should my/sidebar-name-shown)
+      (setq focused nil)
+      (my/sidebar-name-hide-on-blur)
+      (should-not my/sidebar-name-shown))))
 
 ;;; hover-performance-tests.el ends here

@@ -1036,6 +1036,19 @@ LINE is the row's start; KEY changes when the row is drawn again.")
     (setq my/sidebar-name-shown nil)
     (posframe-hide my/sidebar-name-buffer)))
 
+(defun my/sidebar-name-owner-focused-p ()
+  "Return non-nil when the window showing the shortened name has focus on its frame."
+  (let ((window (car my/sidebar-name-shown)))
+    (and (window-live-p window)
+         (eq t (frame-focus-state (window-frame window))))))
+
+(defun my/sidebar-name-hide-on-blur ()
+  "Dismiss the full name when its sidebar frame loses focus."
+  (when (and my/sidebar-name-shown (not (my/sidebar-name-owner-focused-p)))
+    (my/sidebar-name-hide)))
+
+(add-function :after after-focus-change-function #'my/sidebar-name-hide-on-blur)
+
 (defun my/sidebar-name-label (window position)
   "Return the shortened name's overlay on WINDOW's row at POSITION, or nil."
   (with-current-buffer (window-buffer window)
@@ -1135,6 +1148,8 @@ POSITION is from `mouse-pixel-position'."
                          (integerp (cadr position)) (integerp (cddr position))
                          (>= (cadr position) 0) (>= (cddr position) 0)
                          (not (frame-parent frame))
+                         ;; A selected frame can be behind another macOS app.
+                         (eq t (frame-focus-state frame))
                          (window-at-x-y (cadr position) (cddr position) frame)))
          (posn (and candidate
                     (buffer-local-value 'my/sidebar-mode (window-buffer candidate))
@@ -1143,7 +1158,8 @@ POSITION is from `mouse-pixel-position'."
          (point (and posn (posn-point posn))))
     (cond
      ;; The pointer rests on the full name itself.
-     ((and child (eq frame (window-frame child))))
+     ((and child (eq frame (window-frame child))
+           (my/sidebar-name-owner-focused-p)))
      ((and (windowp window) (integerp point) (not (posn-area posn))
            (eq frame (selected-frame))
            (buffer-local-value 'my/sidebar-mode (window-buffer window)))

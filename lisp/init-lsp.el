@@ -59,6 +59,15 @@ and wrapping settings."
       (expand-file-name "multiserver" (file-name-directory
                                       (or load-file-name buffer-file-name))))
 
+(defun my/lsp-go-root (filename)
+  "Use the Go workspace or module containing FILENAME for gopls."
+  (when (and (string-suffix-p ".go" filename) (not (file-remote-p filename)))
+    (when-let* ((root (or (locate-dominating-file filename "go.work")
+                          (locate-dominating-file filename "go.mod"))))
+      (directory-file-name (expand-file-name root)))))
+
+(advice-add 'lsp-bridge--get-project-path-func :after-until #'my/lsp-go-root)
+
 ;; Cmd-click: jump to the definition, or list usages when clicking the
 ;; definition itself, as in JetBrains IDEs.
 ;; macOS maps Command to Super by default.

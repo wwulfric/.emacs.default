@@ -15,6 +15,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'seq)
 (require 'subr-x)
 (require 'treesit nil t)
@@ -51,25 +52,71 @@
 
 ;;;; Scopes
 
+(defun my/sticky-lines--scope-node-p (node)
+  "Return non-nil if NODE introduces a scope to pin."
+  (let ((type (treesit-node-type node)))
+    (or (string-match-p my/sticky-lines-node-regexp type)
+        (pcase (treesit-node-language node)
+          ('go (equal type "func_literal"))
+          ('elisp
+           (pcase type
+             ("macro_definition" t)
+             ("special_form" (equal (treesit-node-type (treesit-node-child node 1)) "lambda"))
+             ("list"
+              (let ((head (treesit-node-child node 0 t)))
+                (and (equal (treesit-node-type head) "symbol")
+                     (equal (treesit-node-text head t) "cl-defun"))))))
+          ('haskell
+           ;; Some Haskell grammars spell the type synonym node "synomym".
+           (or (member type '("signature" "instance" "data_type" "newtype"
+                              "type_synomym" "type_synonym"))
+               (and (equal type "function")
+                    ;; Arrow types also use "function", but have no match.
+                    (treesit-node-child-by-field-name node "match"))
+               (and (equal type "bind")
+                    (treesit-node-child-by-field-name node "name"))))))))
+
+(defun my/sticky-lines--scope-position (node)
+  "Return the position whose line identifies NODE in the pinned text."
+  (let ((anchor node))
+    (when (and (equal (treesit-node-type node) "function_definition")
+               (memq (treesit-node-language node) '(c cpp)))
+      ;; Follow the declarator, avoiding names in types and parameters.
+      (let ((decl (treesit-node-child-by-field-name node "declarator")))
+        (while (and decl (not (member (treesit-node-type decl)
+                                      '("identifier" "field_identifier" "operator_name"
+                                        "destructor_name" "operator_cast"))))
+          (setq decl
+                (pcase (treesit-node-type decl)
+                  ((or "qualified_identifier" "template_function" "template_method")
+                   (treesit-node-child-by-field-name decl "name"))
+                  ((or "parenthesized_declarator" "reference_declarator")
+                   (treesit-node-child decl 0 t))
+                  (_ (treesit-node-child-by-field-name decl "declarator")))))
+        (when decl (setq anchor decl))))
+    (treesit-node-start anchor)))
+
 (defun my/sticky-lines--scopes (position)
-  "Return where the scopes around POSITION start, on lines above it.
-Each is the start of the scope's first line, outermost first."
+  "Return the scope headers preceding the display row starting at POSITION.
+Each is the start of its pinned line, outermost first."
   (save-excursion
     (goto-char position)
-    (let ((line (pos-bol))
-          starts)
+    (let (starts)
       (if (and (fboundp 'treesit-parser-list) (treesit-parser-list))
           (let ((node (ignore-errors
-                        (treesit-node-at (progn (back-to-indentation) (point))))))
+                        (treesit-node-at (max position (progn (back-to-indentation) (point)))))))
             (while node
-              (when (and (string-match-p my/sticky-lines-node-regexp (treesit-node-type node))
-                         (< (treesit-node-start node) line))
-                (push (save-excursion (goto-char (treesit-node-start node)) (pos-bol))
-                      starts))
+              (when (and (< (treesit-node-start node) position)
+                         (my/sticky-lines--scope-node-p node))
+                (let ((anchor (my/sticky-lines--scope-position node)))
+                  ;; A continuation row can hide the header even while
+                  ;; WINDOW still starts on the same source line.
+                  (when (< anchor position)
+                    (push (save-excursion (goto-char anchor) (pos-bol)) starts))))
               (setq node (treesit-node-parent node))))
-        (dolist (open (reverse (nth 9 (syntax-ppss line))))
+        (dolist (open (reverse (nth 9 (syntax-ppss position))))
           (let ((start (save-excursion (goto-char open) (pos-bol))))
-            (when (< start line)
+            (when (< open position)
               (push start starts)))))
       (seq-uniq starts))))
 
@@ -77,11 +124,22 @@ Each is the start of the scope's first line, outermost first."
   "Return the starts of the lines to pin at the top of WINDOW."
   (with-current-buffer (window-buffer window)
     (let* ((top (window-start window))
-           ;; The pinned lines cover as many lines at the top; what counts
-           ;; is the scope of the first line below them.
-           (count (min my/sticky-lines-max (length (my/sticky-lines--scopes top))))
-           (below (save-excursion (goto-char top) (forward-line count) (point))))
-      (seq-take (my/sticky-lines--scopes below) my/sticky-lines-max))))
+           ;; Once the first display row is clipped, use its continuation
+           ;; if it belongs to the same source line.
+           (visible (if (zerop (window-vscroll window t)) top
+                      (save-excursion
+                        (goto-char top)
+                        (let ((end (pos-eol)))
+                          (vertical-motion 1 window)
+                          (if (<= (point) end) (point) top)))))
+           (top-scopes (my/sticky-lines--scopes visible))
+           (count (min my/sticky-lines-max (length top-scopes)))
+           (below (save-excursion (goto-char top) (vertical-motion count window) (point))))
+      ;; Prefer the scope below the pinned rows.  On the last line of a
+      ;; short declaration that probe can already be outside every scope.
+      (seq-take (or (and (> count 0) (my/sticky-lines--scopes below))
+                    top-scopes)
+                my/sticky-lines-max))))
 
 ;;;; Drawing
 
@@ -292,7 +350,7 @@ Each is the start of the scope's first line, outermost first."
 (defun my/sticky-lines--run ()
   "Update the windows waiting for it."
   (setq my/sticky-lines--timer nil)
-  (let ((windows (seq-uniq my/sticky-lines--pending)))
+  (let ((windows my/sticky-lines--pending))
     (setq my/sticky-lines--pending nil)
     (dolist (window windows)
       (when (window-live-p window)
@@ -301,7 +359,7 @@ Each is the start of the scope's first line, outermost first."
 
 (defun my/sticky-lines--schedule (window &optional delay)
   "Update WINDOW's pinned lines after DELAY seconds, or once Emacs is free."
-  (push window my/sticky-lines--pending)
+  (cl-pushnew window my/sticky-lines--pending)
   (unless my/sticky-lines--timer
     ;; Not during redisplay, which calls the scroll functions.
     (setq my/sticky-lines--timer
@@ -310,6 +368,19 @@ Each is the start of the scope's first line, outermost first."
 (defun my/sticky-lines--scrolled (window _start)
   "Update WINDOW's pinned lines once it has scrolled."
   (my/sticky-lines--schedule window))
+
+(defun my/sticky-lines--observe-start (window)
+  "Queue a refresh if WINDOW now displays a different buffer or start."
+  (unless (or (frame-parent (window-frame window)) (window-minibuffer-p window))
+    (let ((seen (window-parameter window 'my/sticky-lines-view))
+          (buffer (window-buffer window))
+          (start (window-start window))
+          (clipped (> (window-vscroll window t) 0)))
+      (unless (and (eq (car-safe seen) buffer)
+                   (consp (cdr-safe seen))
+                   (eql (cadr seen) start) (eq (cddr seen) clipped))
+        (set-window-parameter window 'my/sticky-lines-view (cons buffer (cons start clipped)))
+        (my/sticky-lines--schedule window)))))
 
 (defun my/sticky-lines--frame-changed (frame)
   "Update the pinned lines of FRAME's windows, and drop those of dead ones."
@@ -387,11 +458,13 @@ Each is the start of the scope's first line, outermost first."
           (my/sticky-lines--delete window)))))
   (if my/sticky-lines-mode
       (progn
+        (add-hook 'pre-redisplay-functions #'my/sticky-lines--observe-start)
         (add-hook 'window-scroll-functions #'my/sticky-lines--scrolled)
         (add-hook 'window-size-change-functions #'my/sticky-lines--frame-changed)
         (add-hook 'window-buffer-change-functions #'my/sticky-lines--frame-changed)
         (add-hook 'window-configuration-change-hook #'my/sticky-lines--cleanup)
         (add-hook 'after-change-functions #'my/sticky-lines--changed))
+    (remove-hook 'pre-redisplay-functions #'my/sticky-lines--observe-start)
     (remove-hook 'window-scroll-functions #'my/sticky-lines--scrolled)
     (remove-hook 'window-size-change-functions #'my/sticky-lines--frame-changed)
     (remove-hook 'window-buffer-change-functions #'my/sticky-lines--frame-changed)

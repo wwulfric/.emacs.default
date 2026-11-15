@@ -41,6 +41,8 @@
    '(italic ((t (:slant italic))))
    '(bold-italic ((t (:weight bold :slant italic))))
    `(shadow ((t (:foreground ,muted))))
+   '(hs-ellipsis ((t (:inherit shadow :height 1.0 :box nil))))
+   '(my/hideshow-placeholder ((t (:background "#EEF2F6"))))
    `(cursor ((t (:background ,fg))))
    `(fringe ((t (:foreground ,muted :background ,bg))))
    `(region ((t (:background ,selection :extend t))))

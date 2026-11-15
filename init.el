@@ -85,6 +85,7 @@
 (require 'init-tool-islands)
 ;; IntelliJ's Git tools on top of Magit: Commit tool window, change markers.
 (require 'init-git)
+(require 'init-hideshow)
 (require 'init-navigation)
 ;; S-s-e lists the places visited and changed lately.
 (require 'init-recent-locations)

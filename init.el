@@ -46,9 +46,7 @@
 (setq-default indent-tabs-mode nil)
 (fset 'yes-or-no-p 'y-or-n-p)
 
-(require 'auto-save)
-(auto-save-enable)
-(setq auto-save-silent t)
+(require 'init-auto-save)
 
 ;; Frames, typography, tabs and sidebar.
 (require 'frame-setting)

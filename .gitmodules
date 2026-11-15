@@ -34,9 +34,6 @@
 [submodule "lisp/s.el"]
 	path = lisp/s.el
 	url = https://github.com/magnars/s.el
-[submodule "lisp/auto-save"]
-	path = lisp/auto-save
-	url = https://github.com/manateelazycat/auto-save
 [submodule "lisp/flx"]
 	path = lisp/flx
 	url = https://github.com/lewang/flx

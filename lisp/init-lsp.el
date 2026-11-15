@@ -123,6 +123,7 @@ Otherwise call ORIGINAL with FILENAME, FILEHOST and POSITION to jump."
 (define-key lsp-bridge-source-mode-map (kbd "<s-down-mouse-1>") #'ignore)
 (define-key lsp-bridge-source-mode-map (kbd "<s-mouse-1>") #'my/lsp-click)
 
+(setq lsp-bridge-enable-document-highlight t)
 (global-lsp-bridge-mode)
 ;; (setq lsp-bridge-enable-hover-diagnostic t)
 
